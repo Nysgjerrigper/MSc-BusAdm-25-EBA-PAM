@@ -77,6 +77,7 @@ sesong2223_latinsk |> select(GW) |> unique() |> print(n = 50) # Dronning Elisabe
 sesong2324_latinsk |> select(GW) |> unique() |> print(n = 50)
 sesong2425_latinsk |> select(GW) |> unique() |> print(n = 50)
 
+## Fikse navn ----------------------------------------------------
 # Siden det er noen navnefeil så må vi fikse det
 riktigenavn <- c(
   "Mitoma Kaoru" = "Kaoru Mitoma",
@@ -121,7 +122,7 @@ dim(Sesong_24_25)
 
 sum(is.na(Sesong_22_23) |> sum()) + (is.na(Sesong_23_24) |> sum()) + (is.na(Sesong_24_25) |> sum()) 
 
-# Slå sammen alle sesongene
+## Slå sammen alle sesongene og lagre data ------------------------------------------------------
 allesesesonger <- bind_rows(s22 = Sesong_22_23, s23 = Sesong_23_24, s24 = Sesong_24_25, .id = "season")
 
 # Lagre data
@@ -132,3 +133,15 @@ write_csv(Sesong_24_25, file = "Sesong 24 til 25.csv")
 # Samlet sett
 write_csv(allesesesonger, file = "Alle tre sesonger(22-24).csv")
 
+# Alternativt datasett
+
+Alt_22_23 <- Sesong_22_23
+Alt_23_24 <- Sesong_23_24 |> mutate(GW = GW + 38)
+Alt_24_25 <- Sesong_24_25 |> mutate(GW = GW + 76)
+
+# Slå sammen radene til en dataframe
+alternativsammensatt <- bind_rows(Alt_22_23, Alt_23_24, Alt_24_25)
+
+# Lagre filen
+write_csv(alternativsammensatt, "Differensiert gw alle tre sesonger(22-24).csv")
+cat("Lagret filen\n")
