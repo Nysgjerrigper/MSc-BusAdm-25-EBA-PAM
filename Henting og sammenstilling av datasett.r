@@ -1,5 +1,5 @@
 # Hente og slå sammen full tibble for sesong 22/23, 23/24 og 24/25.
-rm(list = ls())
+rm(list = ls(all = TRUE))
 
 library(tidyverse)
 library(stringi)
@@ -19,8 +19,8 @@ hent_ukentlig <- function(gw) {
   return(data)
 }
 
-# Hent data for gameweeks 1 til 28 (15.03.2025)
-for (i in 1:28) {
+# Hent data for gameweeks 1 til 29 (28.03.2025)
+for (i in 1:29) {
   # Hent data for hver gameweek
   gw_data <- hent_ukentlig(i)
   
@@ -34,7 +34,7 @@ colnames(s22);colnames(gameweek28)
 kolonner <- s22 |> select(1:40) |> colnames() # fjern GW, ettersom ukentlig ikke har GW
 
 # Loop gjennom alle gameweeks og fjern ekstra kolonner
-for (i in 1:28) {
+for (i in 1:29) {
     # Hent data for hver gameweek
     gw_data <- get(str_c("gameweek", i))
     
@@ -52,7 +52,7 @@ sum(colnames(gameweek1) == colnames(gameweek28)) # 40
 sesong_2425 <- tibble()
 
 # Løkke for å sette sammen alle gameweeks
-for (i in 1:28) {
+for (i in 1:29) {
   # Trekk ut df navn
   df_name <- str_c("gameweek", i)
   df <- get(df_name)
@@ -122,6 +122,81 @@ dim(Sesong_24_25)
 
 sum(is.na(Sesong_22_23) |> sum()) + (is.na(Sesong_23_24) |> sum()) + (is.na(Sesong_24_25) |> sum()) 
 
+# Fiks lagnavn
+lag2022 <- c(
+  "Arsenal", "Aston Villa", "Bournemouth", "Brentford", "Brighton", 
+  "Chelsea", "Crystal Palace", "Everton", "Fulham", "Leeds", 
+  "Leicester", "Liverpool", "Man City", "Man United", "Newcastle", 
+  "Nottingham Forest", "Southampton", "Tottenham", "West Ham", "Wolves"
+)
+Sesong_22_23 <- Sesong_22_23 %>%
+  mutate(opponent_team = lag2022[opponent_team])
+
+Sesong_22_23 <- Sesong_22_23 %>%
+  mutate(team = recode(team,
+                       "Spurs" = "Tottenham",
+                       "Nott'm Forest" = "Nottingham Forest",
+                       "Man Utd" = "Man United",
+                       "Leicester City" = "Leicester"))
+
+lag2023 <- c(
+  "Arsenal", "Aston Villa", "Bournemouth", "Brentford", "Brighton", 
+  "Burnley", "Chelsea", "Crystal Palace", "Everton", "Fulham", 
+  "Liverpool", "Luton", "Man City", "Man United", "Newcastle", 
+  "Nottingham Forest", "Sheffield Utd", "Tottenham", "West Ham", "Wolves"
+)
+Sesong_23_24 <- Sesong_23_24 %>%
+  mutate(opponent_team = lag2023[opponent_team])
+Sesong_23_24 <- Sesong_23_24 %>%
+  mutate(team = recode(team,
+                       "Spurs" = "Tottenham",
+                       "Nott'm Forest" = "Nottingham Forest",
+                       "Man Utd" = "Man United"
+  ))
+
+lag2024 <- c(
+  "Arsenal", "Aston Villa", "Bournemouth", "Brentford", "Brighton", 
+  "Chelsea", "Crystal Palace", "Everton", "Fulham", "Ipswich", 
+  "Leicester", "Liverpool", "Man City", "Man United", "Newcastle", 
+  "Nottingham Forest", "Southampton", "Tottenham", "West Ham", "Wolves"
+)
+Sesong_24_25 <- Sesong_24_25 %>%
+  mutate(opponent_team = as.numeric(opponent_team)) %>%
+  mutate(opponent_team = lag2024[opponent_team])
+Sesong_24_25 <- Sesong_24_25 %>%
+  mutate(team = recode(team,
+                       "Spurs" = "Tottenham",
+                       "Man Utd" = "Man United",
+                       "Nott'm Forest" = "Nottingham Forest"
+  ))
+
+
+## Fjern Element Kolonner, denne inneholder ID til spillere men varierer fra sesong til sesong
+
+Sesong_22_23 <- Sesong_22_23 |> select(-element)
+Sesong_23_24 <- Sesong_23_24 |> select(-element)
+Sesong_24_25 <- Sesong_24_25 |> select(-element)
+
+# Sjekk
+dim(Sesong_22_23);dim(Sesong_23_24);dim(Sesong_24_25) # 40
+
+## Fjern Assistent Managere fra datasettet.
+
+assistentmanagere <- c("Mikel Arteta", "Enzo Maresca", "Arne Slot", "Pep Guardiola", 
+                        "Eddie Howe","Andoni Iraola","Fabian Hurzeler",
+                        "Marco Silva", "Nuno Espirito Santo", "Ange Postecoglou",
+                         "Unai Emery", "Thomas Frank", "Oliver Glasner",
+                         "Ruben Amorim", "Vitor Pereira", "David Moyes",
+                         "Kieran McKenna", "Ruud van Nistelrooy", "Ivan Juric",
+                         "Graham Potter") # Managerliste
+
+# Fjern am
+Sesong_24_25 <- Sesong_24_25 |> filter(!name %in% assistentmanagere)
+
+# Sjekk om noen assistentmanagere fortsatt finnes i datasettet
+Sesong_24_25 |> filter(name %in% assistentmanagere)
+
+
 ## Slå sammen alle sesongene og lagre data ------------------------------------------------------
 allesesesonger <- bind_rows(s22 = Sesong_22_23, s23 = Sesong_23_24, s24 = Sesong_24_25, .id = "season")
 
@@ -130,11 +205,12 @@ allesesesonger <- bind_rows(s22 = Sesong_22_23, s23 = Sesong_23_24, s24 = Sesong
 write_csv(Sesong_22_23, file = "Sesong 22 til 23.csv")
 write_csv(Sesong_23_24, file = "Sesong 23 til 24.csv")
 write_csv(Sesong_24_25, file = "Sesong 24 til 25.csv")
+cat("Lagret filene\n")
 # Samlet sett
 write_csv(allesesesonger, file = "Alle tre sesonger(22-24).csv")
+cat("Lagret filen\n")
 
 # Alternativt datasett
-
 Alt_22_23 <- Sesong_22_23
 Alt_23_24 <- Sesong_23_24 |> mutate(GW = GW + 38)
 Alt_24_25 <- Sesong_24_25 |> mutate(GW = GW + 76)
@@ -142,6 +218,13 @@ Alt_24_25 <- Sesong_24_25 |> mutate(GW = GW + 76)
 # Slå sammen radene til en dataframe
 alternativsammensatt <- bind_rows(Alt_22_23, Alt_23_24, Alt_24_25)
 
+# Konverter ... til integer
+alternativsammensatt <- alternativsammensatt %>%
+  mutate(was_home = as.integer(was_home))
+
+alternativsammensatt <- alternativsammensatt %>%
+  mutate(player_id = as.integer(factor(name)))
+
 # Lagre filen
-write_csv(alternativsammensatt, "Differensiert gw alle tre sesonger(22-24).csv")
-cat("Lagret filen\n")
+write_csv(alternativsammensatt, "Differensiert gw alle tre sesonger(22-24), heltall.csv")
+cat("Lagret alternativ filen\n")
