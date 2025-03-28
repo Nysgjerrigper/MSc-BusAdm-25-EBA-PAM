@@ -200,6 +200,10 @@ Sesong_24_25 |> filter(name %in% assistentmanagere)
 ## Slå sammen alle sesongene og lagre data ------------------------------------------------------
 allesesesonger <- bind_rows(s22 = Sesong_22_23, s23 = Sesong_23_24, s24 = Sesong_24_25, .id = "season")
 
+allesesonger <- allesesesonger |>
+  mutate(player_id = as.integer(factor(name)))
+
+
 # Lagre data
 # Sesongvis
 write_csv(Sesong_22_23, file = "Sesong 22 til 23.csv")
