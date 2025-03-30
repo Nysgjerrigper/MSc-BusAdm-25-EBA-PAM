@@ -1,50 +1,48 @@
 # Blandet heltalls modell  ----
-# Basert på Kristiansen et al.
+# Basert på Kristiansen et al. # NOTE! ALL EQUATIONS AND TABLE NUMBERS REFER TO THEIR THESIS
+# THIS MIGHT BE CHANGED AT A LATER TIME, BUT IS KEPT LIKE THIS UNDER PROD. TO KEEP EVERYTHING 
+# "OVERSIKTLIG" -PER 30.03
 rm(list = ls(all = TRUE))
 # Pakker
 library(tidyverse)
-library(ompr); library(ompr.roi); library(ROI.plugin.highs)
-citation("keras3");citation("tensorflow");citation("ompr")
+library(ompr); library(ompr.roi); library(ROI.plugin.glpk)
+#citation("keras3");citation("tensorflow");citation("ompr")
 
 # Forsøker på en sesong først for å se om det fungerer, Den nyeste sesongen er minst
 allesesonger <- read_csv("Differensiert gw alle tre sesonger(22-24), heltall.csv")
-allesesonger |> colnames()
-length(unique(allesesonger$name)) == length(unique(allesesonger$player_id))
+
+#length(unique(allesesonger$name)) == length(unique(allesesonger$player_id))
 
 # En hel sesong tar veldig lang tid så derfor prøver jeg først med 3 uker
-
-treuker <- allesesonger |> filter(GW <= 3)
-view(treuker)
-
-#Bruker data for å forenkle senere endringer i kode
-
-data <- treuker
+data <- allesesonger |> filter(GW <= 3)
+#data |> filter(name == "Mohamed Salah") |> select(GW, name, player_id, team, position, total_points) # Sjekker at data er riktig
 
 # Set Table 4.1 Kristiansen et al. 2018
-
 T_setofgameweeks <- unique(data$GW) # Sett med gameweeks
 P_setofplayers <- unique(data$player_id) # Sett med spillere
 C_setofteams <- unique(data$team) # Sett med lag
 L_substitution <- c(1:3) # Ubytter rekkefølge, er bare 3 innbyttere 
 
 # Subset  Table 4.2 Kristiansen et al. 2018
-Pdef <- data |> filter(position == "DEF") # Sett Forsvarsspillere
-Pmid <- data |> filter(position == "MID") # Sett Midtbanespillere
-Pfwd <- data |> filter(position == "FWD") # Sett Angrepsspillere
-Pgk <- data |> filter(position == "GK") # Sett Keepere
+Pdef <- unique(data$player_id[data$position == "DEF"]) # Sett Forsvarsplillere
+Pmid <- unique(data$player_id[data$position == "MID"]) # Sett Midtbane -||-
+Pfwd <- unique(data$player_id[data$position == "FWD"]) # Sett Angreps-||-
+Pgk <- unique(data$player_id[data$position == "GK"]) # Sett målvakts-||-
+P_not_gk <- unique(data$player_id[data$position != "GK"]) # Sett spillere som ikke er målvakt til constraint 4.3
+
 P_c <- split(data$player_id, data$team)  # Sett med spillere etter lag c
 
 medianavgameweeks <- median(T_setofgameweeks) # Midt i sesongen
 T_FH <- T_setofgameweeks[T_setofgameweeks <= medianavgameweeks] # Første halvdel av datasettet
 T_SH <- T_setofgameweeks[T_setofgameweeks > medianavgameweeks] # Andre halvdel av datasettet
 
-# Index Table 4.3 Kristiansen et al. 2018
+## Index Table 4.3 Kristiansen et al. 2018 -----
 
 t <- T_setofgameweeks# Gameweek
 p <- P_setofplayers # Spillere
 l <- L_substitution # Ubytter rekkefølge
 
-# Parametre Table 4.4 Kristiansen et al. 2018
+## Parametre Table 4.4 Kristiansen et al. 2018 -----
 R <- 4              # Straff for hver overgang utover gratis overganger
 MK <- 2              # Goalkeepers required in squad
 MD <- 5               # Defenders required in squad
@@ -56,363 +54,294 @@ EK <- 1               # Goalkeepers required in starting line-up
 ED <- 3               # Min defenders required in starting line-up
 EM <- 3               # Min midfielders required
 EF <- 1               # Min forwards required in starting line-up
-BS <- 1000.0           # Starting budget (adjust if mid-season)
+BS <- 1000.0           # Start budsjett, i value kolonnen er det satt *10 
 phi <- (MK+MD+MM+MF) - (E+EK) # Number of substitutes on bench
 phi_K <- MK - EK        # Number of GK substitutes
 Q_bar <- 4            # Max number of free transfers to accumulate
 Q_under_bar <- 1                # Free transfers given per gameweek 
  
-# Konstant parametre
-epsilon <- 0.01    #  eps << 1
-kappa <- setNames(10^-(2:(length(l) + 1)), l) # Weights for subs priorities
+## Konstant parametre -----
+epsilon <- 0.1  #  eps << 1
+kappa <- c(0.01, 0.005, 0.001) # Weights for subs priorities (3 values for 3 substitutes)
+beta <- length(P_setofplayers)     # Tilstrekkelig høy konstant??? 
+alpha_bar <- length(P_setofplayers) # Tilstrekkelig høy konstant???
 
-# Antall spillere og uker
-n_players <- length(P_setofplayers)
-n_gameweeks <- length(T_setofgameweeks)
-
-beta <- n_players     # Tilstrekkelig høy konstant??? 
-alpha_bar <- n_players # Tilstrekkelig høy konstant???
-
-# Variabler Tabell 4.5 Kristiansen et al. 2018
+# Variabler Tabell 4.5 Kristiansen et al. 2018 ----
 # Initialiser modellen
-model <- MIPModel() %>%
+model <- MILPModel() %>%
   
   # ---- Binære variabler (Tabell 4.5) ----
   # Squad selection (x_pt)
-  add_variable(x[p, t], p = 1:n_players, t = T_setofgameweeks, type = "binary") %>%
+  add_variable(x[p, t], p = p, t = t, type = "binary") %>%
   
   # Free Hit squad (x_pt^freehit)
-  add_variable(x_freehit[p, t], p = 1:n_players, t = T_setofgameweeks, type = "binary") %>%
+  add_variable(x_freehit[p, t], p = p, t = t, type = "binary") %>%
   
   # Starting line-up (y_pt)
-  add_variable(y[p, t], p = 1:n_players, t = T_setofgameweeks, type = "binary") %>%
+  add_variable(y[p, t], p = p, t = t, type = "binary") %>%
   
   # Captain (f_pt)
-  add_variable(f[p, t], p = 1:n_players, t = T_setofgameweeks, type = "binary") %>%
+  add_variable(f[p, t], p = p, t = t, type = "binary") %>%
   
   # Vice-captain (h_pt)
-  add_variable(h[p, t], p = 1:n_players, t = T_setofgameweeks, type = "binary") %>%
+  add_variable(h[p, t], p = p, t = t, type = "binary") %>%
   
   # Substitutionsprioritet (g_ptl)
-  add_variable(g[p, t, l], p = 1:n_players, t = T_setofgameweeks, l = L_substitution, type = "binary") %>%
+  add_variable(g[p, t, l], p = p, t = t, l = L_substitution, type = "binary") %>%
   
   # Transfers out (u_pt)
-  add_variable(u[p, t], p = 1:n_players, t = T_setofgameweeks, type = "binary") %>%
+  add_variable(u[p, t], p = p, t = t, type = "binary") %>%
   
   # Transfers in (e_pt)
-  add_variable(e[p, t], p = 1:n_players, t = T_setofgameweeks, type = "binary") %>%
+  add_variable(e[p, t], p = p, t = t, type = "binary") %>%
   
   # Wildcard (w_t)
-  add_variable(w[t], t = T_setofgameweeks, type = "binary") %>%
+  add_variable(w[t], t = t, type = "binary") %>%
   
   # Triple Captain (c_pt)
-  add_variable(c[p, t], p = 1:n_players, t = T_setofgameweeks, type = "binary") %>%
+  add_variable(c[p, t], p = p, t = t, type = "binary") %>%
   
   # Bench Boost (b_t)
-  add_variable(b[t], t = T_setofgameweeks, type = "binary") %>%
+  add_variable(b[t], t = t, type = "binary") %>%
   
   # Free Hit (r_t)
-  add_variable(r[t], t = T_setofgameweeks, type = "binary") %>%
+  add_variable(r[t], t = t, type = "binary") %>%
   
+  # Binær "Auxiliary" variabel (lambda_pt)
+  add_variable(lambda[p, t], p = p, t = t, type = "binary") %>%
+
   # ---- Kontinuerlige/heltallsvariabler ----
   # Gjenværende budsjett (v_t)
-  add_variable(v[t], t = T_setofgameweeks, type = "continuous", lb = 0) %>%
+  add_variable(v[t], t = t, type = "continuous", lb = 0) %>%
   
   # Gratis overganger (q_t)
-  add_variable(q[t], t = T_setofgameweeks, type = "integer", lb = 0, ub = Q_bar) %>%
+  add_variable(q[t], t = t, type = "integer", lb = 0, ub = Q_bar) %>%
   
   # Straffeoverganger (alpha_t)
-  add_variable(alpha[t], t = T_setofgameweeks, type = "integer", lb = 0)
-
-# Legg til posisjonsindekser for enklere constraints
-goalkeepers <- which(data$position == "GK")
-defenders <- which(data$position == "DEF")
-midfielders <- which(data$position == "MID")
-forwards <- which(data$position == "FWD")
+  add_variable(alpha[t], t = t, type = "integer", lb = 0)
 
 
-### Gem 2.5
+# Constrains ----
 
-# --- 0. Load Libraries ---
-# Make sure these are installed: install.packages(c("dplyr", "tidyr", "ompr", "ompr.roi", "ROI.plugin.glpk"))
-library(dplyr)
-library(tidyr)
-library(ompr)
-library(ompr.roi)
-library(ROI.plugin.glpk) # Using GLPK solver (free)
+## Gamechips (4.2 - 4.6)
+model <- model %>%
+  
+  # ---- Gamechips (4.2 - 4.6) ----
+  # Wildcard (w_t)
+  add_constraint(sum_expr(w[t], t = T_FH) <= 1) %>% # First
+  
+  add_constraint(sum_expr(w[t], t = T_SH) <= 1) %>% # Second
+  
+  # Triple Captain (c_pt) - FIXED
+  add_constraint(sum_expr(c[p, t], p = P_setofplayers, t = T_setofgameweeks) <= 1) %>%
+  
+  # Bench Boost (b_t)
+  add_constraint(sum_expr(b[t], t = T_setofgameweeks) <= 1) %>%
+  
+  # Free Hit (r_t)
+  add_constraint(sum_expr(r[t], t = T_setofgameweeks) <= 1) %>%
 
-# --- Load Your Data ---
-# IMPORTANT: Replace this with code to load YOUR actual data frame
-# It MUST have columns: player_id, GW, position, team, xP, value
-# Example structure:
-# fpl_data_raw <- read.csv("your_fpl_data_with_lstm_xp.csv")
-# For demonstration, we create a sample:
-set.seed(42)
-example_players <- paste("Player", 1:50)
-example_teams <- paste("Team", LETTERS[1:10])
-example_positions <- c("GKP", "DEF", "MID", "FWD")
+  # Ensure only one GC per week - FIXED
+  add_constraint(w[t] + sum_expr(c[p, t], p = P_setofplayers) + b[t] + r[t] <= 1, 
+                t = T_setofgameweeks)
 
-fpl_data_raw <- expand.grid(player_name = example_players, GW = 1:5) %>%
-  group_by(player_name) %>%
-  mutate(
-    player_id = cur_group_id(),
-    position = sample(example_positions, 1, prob = c(0.1, 0.4, 0.4, 0.1)),
-    team = sample(example_teams, 1)
-  ) %>%
-  ungroup() %>%
-  mutate(
-    xP = pmax(0, rnorm(n(), mean = 3, sd = 2)), # YOUR LSTM FORECASTS GO HERE
-    value = round(runif(n(), 4.0, 13.0) * 2) / 2
-  ) %>%
-  select(player_id, player_name, GW, position, team, xP, value)
 
-print("Sample of your loaded data structure:")
-head(fpl_data_raw)
+##Selected squad constraints (4.8-4.17) ----
+model <- model %>%
+    # Position requirements 4.8-4.11
+    add_constraint(sum_expr(x[p, t], p = Pgk, t = t) == MK, t = t) %>% # Exactly 2 GK
+    add_constraint(sum_expr(x[p, t], p = Pdef, t = t) == MD, t = t) %>% # Exactly 5 DEF
+    add_constraint(sum_expr(x[p, t], p = Pmid, t = t) == MM, t = t) %>% # Exactly 5 MID
+    add_constraint(sum_expr(x[p, t], p = Pfwd, t = t) == MF, t = t)  # Exactly 3 FWD
 
-# REAl DATA
 
-testdata <- read_csv("Differensiert gw alle tre sesonger(22-24), heltall.csv")
+# Remove the problematic team constraint
+# add_constraint(
+#     sum_expr(x[p, t], p = P_c[[c]]) <= MC,
+#     c = C_setofteams, t = t
+# )
 
-testdata <- testdata |> select(player_id,name, GW, position, team, xP, value) 
+    # Team limit constraints (max 3 players from each team) 4.12
+    for (team_name in C_setofteams) {
+      team_players <- P_c[[team_name]]
+      model <- model %>%
+        add_constraint(
+          sum_expr(x[p, t], p = team_players) <= MC,
+          t = t
+        )
+    } 
 
-# --- Define Planning Horizon ---
-start_gw <- 1
-end_gw <- 2 # How many weeks ahead to plan?
-planning_gameweeks <- start_gw:end_gw
+model <- model |>    
+    # Free Hit Only Constraints 4.13 - 4.17
+    add_constraint(sum_expr(x_freehit[p, t], p = p) == MK*r[t], t = t) %>% 
+    add_constraint(sum_expr(x_freehit[p, t], p = p) == MD*r[t], t = t) %>% 
+    add_constraint(sum_expr(x_freehit[p, t], p = p) == MM*r[t], t = t) %>% 
+    add_constraint(sum_expr(x_freehit[p, t], p = p) == MF*r[t], t = t)
 
-# Filter data for the planning horizon
-fpl_data <- testdata %>%
-  filter(GW %in% planning_gameweeks)
-
-if(nrow(fpl_data) == 0) stop("No data for planning gameweeks.")
-
-print(paste("Planning horizon GWs:", paste(planning_gameweeks, collapse = ", ")))
-
-# --- 1. Define Sets (Table 4.1) ---
-# These are the basic lists of items we work with.
-
-# T: Set of Gameweeks in our plan (derived from your GW column)
-T_set <- unique(fpl_data$GW)
-print(paste("Set T (Gameweeks):", paste(sort(T_set), collapse=", ")))
-
-# P: Set of unique Players considered (derived from your player_id column)
-P_set <- unique(fpl_data$player_id)
-n_players <- length(P_set)
-print(paste("Set P (Players): Count =", n_players))
-
-# C: Set of unique Teams involved (derived from your team column)
-C_set <- unique(fpl_data$team)
-print(paste("Set C (Teams):", paste(sort(C_set), collapse=", ")))
-
-# L: Set of Substitution Priorities (defined by FPL rules)
-L_set <- 1:3 # Bench order 1, 2, 3
-print(paste("Set L (Priorities):", paste(L_set, collapse=", ")))
-
-# --- 2. Define Subsets (Table 4.2) ---
-# These are specific groups *within* the main sets.
-
-# Player info lookup (useful for defining subsets and constraints)
-player_lookup <- fpl_data %>%
-  group_by(player_id) %>%
-  summarise(
-    player_name = first(name),
-    position = first(position), # Assumes position is constant
-    team = first(team),         # Assumes team is constant in planning horizon
-    .groups = 'drop'
-  )
-
-# P^K, P^D, P^M, P^F: Subsets of Players by Position (using your position column)
-P_K <- player_lookup$player_id[player_lookup$position == "GK"]
-P_D <- player_lookup$player_id[player_lookup$position == "DEF"]
-P_M <- player_lookup$player_id[player_lookup$position == "MID"]
-P_F <- player_lookup$player_id[player_lookup$position == "FWD"]
-print(paste("Subset P^K (Goalkeepers):", length(P_K)))
-print(paste("Subset P^D (Defenders):", length(P_D)))
-print(paste("Subset P^M (Midfielders):", length(P_M)))
-print(paste("Subset P^F (Forwards):", length(P_F)))
-
-# P_c: Subset of players in team c. We don't pre-calculate this.
-# Instead, we use the 'player_lookup' table inside constraints later.
-
-# T_FH, T_SH: Gameweek halves (relative to the full 38-GW season)
-total_season_gws <- 38
-mid_season_gw <- floor(total_season_gws / 2)
-T_FH <- T_set[T_set <= mid_season_gw] # GWs in first half *that are in our plan*
-T_SH <- T_set[T_set > mid_season_gw]  # GWs in second half *that are in our plan*
-print(paste("Subset T_FH (First Half GWs in Plan):", paste(T_FH, collapse=", ")))
-print(paste("Subset T_SH (Second Half GWs in Plan):", paste(T_SH, collapse=", ")))
-
-# --- 3. Define Parameters (Table 4.4) ---
-# These are the known inputs/constants for the model.
-
-# P_pt(wt) -> ExpP_pt (Expected Points parameter)
-# This comes DIRECTLY from your 'xP' column.
-exp_points_df <- fpl_data %>%
-  select(p = player_id, t = GW, ExpP = xP) %>%
-  group_by(p, t) %>%
-  summarise(ExpP = mean(ExpP, na.rm = TRUE), .groups = 'drop') %>%
-  tidyr::complete(p = P_set, t = T_set, fill = list(ExpP = 0)) # Fill missing with 0 points
-print("Parameter ExpP_pt (Expected Points): First 6 rows")
-head(exp_points_df)
-
-# CB_pt (Buy Price / "Value") and CS_pt (Sell Price) parameters
-# Both derived from your 'value' column (deterministic simplification).
-prices_df <- fpl_data %>%
-  select(p = player_id, t = GW, CB = value) %>%
-  mutate(CS = CB) |># Simplification: Sell Price = Buy Price
-  group_by(p, t) %>%
-  summarise(
-    CB = mean(CB, na.rm = TRUE),
-    CS = mean(CS, na.rm = TRUE),
-    .groups = 'drop'
-   ) %>%
-  tidyr::complete(p = P_set, t = T_set, fill = list(CB = 1000, CS = 0)) # Fill missing
-print("Parameters CB_pt (Buy Price) & CS_pt (Sell Price): First 6 rows")
-head(prices_df)
-
-# --- FPL Rule Constants & Model Constants ---
-# Stored in a list for easy access
-params <- list(
-  # From FPL Rules
-  R = 4,                # Points deduction per penalized transfer
-  MK = 2,               # Goalkeepers required in squad
-  MD = 5,               # Defenders required in squad
-  MM = 5,               # Midfielders required in squad
-  MF = 3,               # Forwards required in squad
-  MC = 3,               # Max players allowed from the same team
-  E = 11,               # Players required in starting line-up
-  EK = 1,               # Goalkeepers required in starting line-up
-  ED = 3,               # Min defenders required in starting line-up
-  EM = 2,               # Min midfielders required (check rules, might be >=3)
-  EF = 1,               # Min forwards required in starting line-up
-  BS = 100.0,           # Starting budget (adjust if mid-season)
-  phi = (2+5+5+3) - 11, # Number of substitutes on bench
-  phi_K = 2 - 1,        # Number of GK substitutes
-  Q_bar = 2,            # Max number of free transfers to accumulate
-  Q = 1,                # Free transfers given per gameweek
-  # For Model Formulation
-  epsilon = 0.01,       # Small value for vice-captain boost (objective)
-  kappa = setNames(10^-(2:(length(L_set) + 1)), L_set), # Weights for subs priorities
-  beta = n_players,     # Sufficiently high 'Big M' for constraints 4.30, 4.31
-  alpha_bar = n_players # Sufficiently high 'Big M' for constraint 4.42
-)
-print("Game Rule & Model Parameters (list 'params'):")
-print(params)
-
-# --- Helper functions to easily get parameter values later ---
-# These functions look up values from our prepared data frames.
-get_param_value <- function(df, player, gameweek, col_name, default_value) {
-  val <- df[[col_name]][df$p == player & df$t == gameweek]
-  if (length(val) == 0 || is.na(val[1])) return(default_value)
-  return(val[1])
-}
-get_ExpP <- function(player, gameweek) get_param_value(exp_points_df, player, gameweek, "ExpP", 0)
-get_CB <- function(player, gameweek) get_param_value(prices_df, player, gameweek, "CB", params$BS * 10)
-get_CS <- function(player, gameweek) get_param_value(prices_df, player, gameweek, "CS", 0)
-get_Team <- function(player) player_lookup$team[player_lookup$player_id == player][1]
-get_players_in_team <- function(team_id) player_lookup$player_id[player_lookup$team == team_id]
-
-print("Helper functions created (get_ExpP, get_CB, get_CS, etc.)")
-
-# --- 4. Define Variables (Table 4.5) ---
-# These are the decisions the optimization model needs to make.
-# We use ompr's add_variable() function.
-
-model <- MIPModel() %>%
-
-  # x[p,t]: 1 if player p is in the NORMAL squad in GW t, 0 otherwise
-  add_variable(x[p, t], p = P_set, t = T_set, type = "binary") %>%
-
-  # x_fh[p,t]: 1 if player p is in the squad during a FREE HIT in GW t, 0 otherwise
-  add_variable(x_fh[p, t], p = P_set, t = T_set, type = "binary") %>%
-
-  # y[p,t]: 1 if player p is in the STARTING LINEUP in GW t, 0 otherwise
-  add_variable(y[p, t], p = P_set, t = T_set, type = "binary") %>%
-
-  # f[p,t]: 1 if player p is CAPTAIN in GW t, 0 otherwise
-  add_variable(f[p, t], p = P_set, t = T_set, type = "binary") %>%
-
-  # h[p,t]: 1 if player p is VICE-CAPTAIN in GW t, 0 otherwise
-  add_variable(h[p, t], p = P_set, t = T_set, type = "binary") %>%
-
-  # g[p,t,l]: 1 if player p has SUBSTITUTION priority l on the bench in GW t, 0 otherwise
-  add_variable(g[p, t, l], p = P_set, t = T_set, l = L_set, type = "binary") %>%
-
-  # u[p,t]: 1 if player p is TRANSFERRED OUT before GW t, 0 otherwise
-  # Note: Transfers happen *between* gameweeks. u[p,t] affects the squad *for* GW t.
-  # Defined only for t >= start_gw + 1, as no transfers before the first GW.
-  add_variable(u[p, t], p = P_set, t = T_set[T_set >= start_gw + 1], type = "binary") %>%
-
-  # e[p,t]: 1 if player p is TRANSFERRED IN before GW t, 0 otherwise
-  add_variable(e[p, t], p = P_set, t = T_set[T_set >= start_gw + 1], type = "binary") %>%
-
-  # w[t]: 1 if WILDCARD chip is used in GW t, 0 otherwise
-  add_variable(w[t], t = T_set, type = "binary") %>%
-
-  # c[p,t]: 1 if TRIPLE CAPTAIN chip is used on player p in GW t, 0 otherwise
-  add_variable(c[p, t], p = P_set, t = T_set, type = "binary") %>%
-
-  # b[t]: 1 if BENCH BOOST chip is used in GW t, 0 otherwise
-  add_variable(b[t], t = T_set, type = "binary") %>%
-
-  # r[t]: 1 if FREE HIT chip is used in GW t, 0 otherwise
-  add_variable(r[t], t = T_set, type = "binary") %>%
-
-  # lambda[p,t]: Auxiliary binary variable for linearizing the starting lineup constraint (Eq 4.24-4.26)
-  add_variable(lambda[p, t], p = P_set, t = T_set, type = "binary") %>%
-
-  # v[t]: Remaining budget (£m) AT THE END of GW t
-  add_variable(v[t], t = T_set, type = "continuous", lb = 0) %>%
-
-  # q[t]: Number of free transfers available AT THE START of GW t (for transfers before GW t+1)
-  # Defined only for t >= start_gw + 1
-  add_variable(q[t], t = T_set[T_set >= start_gw + 1], type = "integer", lb = 0, ub = params$Q_bar) %>%
-
-  # alpha[t]: Number of penalized transfers made IN GW t (i.e., transfers before GW t+1 costing points)
-  # Defined only for t >= start_gw + 1
-  add_variable(alpha[t], t = T_set[T_set >= start_gw + 1], type = "integer", lb = 0)
-
-print("Variables defined within the 'ompr' model.")
-# You can inspect the model structure (optional)
-print(model)
-
-# --- Step 5: Define the Objective Function ---
-# This implements the deterministic objective function shown in Chapter 5, Section 5.1
-# using our forecasted expected points (p-hat_pt), which come from get_ExpP(p,t) -> your xP column.
-
-# Assuming 'model' is the ompr model object created in the previous step
-# (containing add_variable calls)
-
-model <- model %>% # Continue adding to the existing model object
-  set_objective(
-    # Sum over all players (p in P_set) and all gameweeks (t in T_set)
-    sum_expr(
-      # Expected points from player p starting in gameweek t
-      get_ExpP(p, t) * y[p, t] +
-
-      # ADDED expected points if player p is captain (1 * ExpP)
-      get_ExpP(p, t) * f[p, t] +
-
-      # ADDED expected points if player p is vice-captain (epsilon * ExpP - very small boost)
-      params$epsilon * get_ExpP(p, t) * h[p, t] +
-
-      # ADDED expected points from substitutions (kappa_l * ExpP for sub priority l)
-      sum_expr(params$kappa[l] * get_ExpP(p, t) * g[p, t, l], l = L_set) +
-
-      # ADDED expected points if Triple Captain chip is used (2 * ExpP)
-      2 * get_ExpP(p, t) * c[p, t],
-
-      # Specify indices for the outer summation
-      p = P_set, t = T_set
+# Then add team constraints in a separate loop
+for (team_name in C_setofteams) {
+  team_players <- P_c[[team_name]]
+  model <- model %>%
+    add_constraint(
+      sum_expr(x_freehit[p, t], p = team_players) <= MC*r[t],
+      t = t
     )
-    # SUBTRACT total penalty points from penalized transfers
-    - sum_expr(params$R * alpha[t], t = T_set[T_set >= start_gw + 1]),
+} 
 
-    # Specify the goal: maximize this total value
-    sense = "max"
+## Starting Line-up Constraints (4.18-4.22) ----
+model <- model |> 
+    # Starting lineup constraints 4.18-4.19
+    add_constraint(sum_expr(y[p, t], p = p) == E + phi*b[t], t = t) |> # Antall spillere i XI, med unntak hvis Bench Bust er aktivert da legges till subsa
+    add_constraint(sum_expr(y[p, t], p = Pgk) == EK + phi_K*b[t], t = t) |> # Samma som over bare for keepere, dvs. 1 keeper på, een av
+  
+    # Position requirements in starting lineup 4.20-4.22
+    add_constraint(sum_expr(y[p, t], p = Pdef) >= ED, t = t) %>% # At least 3 DEF starting
+    add_constraint(sum_expr(y[p, t], p = Pmid) >= EM, t = t) %>% # At least 3 MID starting
+    add_constraint(sum_expr(y[p, t], p = Pfwd) >= EF, t = t) %>% # At least 1 FWD sta
+    
+    # 4.23 ( Hvis jeg hadde lest ordentlig hva de mener i teksten under 4.23 så hadde jeg spart mye tid...)
+    # add_constraint(y[p,t] <= x_freehit[p, t] + x[p, t]*(1-r[t]), p = p, t = t) %>% # Starting lineup must be in squad 
+    
+    # Free hit contrainst 4.24 - 4.26
+    add_constraint(y[p, t] <= x_freehit[p, t] + lambda[p, t], p = p, t = t) %>% 
+    add_constraint(lambda[p, t] <= x[p, t], p = p, t = t) %>% 
+    add_constraint(lambda[p, t] <= (1-r[t]), p = p, t = t)
+
+## Captain and vice-captain constraints (4.27-4.29) ----
+model <- model |> 
+    add_constraint(sum_expr(f[p, t]) + sum_expr(c[p,t])== 1,p = p, t = t) %>% # Only one cap per gw
+    add_constraint(sum_expr(h[p, t], p = p) == 1, t = t) %>% # Samma som over for Vise kap
+    add_constraint(f[p, t] + c[p, t] + h[p, t] <= y[p, t], p = p, t = t) # Either cap, vc or 3xcap in one gw
+
+## Substitution constraints (4.30-4.32) ----
+model <- model |>
+    add_constraint( y[p, t] + sum_expr(g[p, t, l], l = l) <= x[p, t] + beta*r[t], p = P_not_gk, t = t) %>% #4.30
+    add_constraint( y[p, t] + sum_expr(g[p, t, l], l = l) <= x_freehit[p, t] + beta*(1-r[t]), p = P_not_gk, t = t) %>% #4.31
+    add_constraint(sum_expr(g[p, t, l] ,p = P_not_gk) <= 1, t = t, l = l) #4.32
+
+## Budget Constraints # 4.33-4.36 !!!! MULIG FEIL
+
+
+#CBSpt <- data |> select(player_id, GW, value)
+#head(CBSpt, 1)
+
+#model <- model |> 
+#    add_constraint(BS - sum_expr(CBSpt*x[p,t], p = p) == v[t], t = 1) |>#4.33
+#    add_constraint(v[t-1] + sum_expr(CBSpt[p, t]*u[p, t], p = p) - sum_expr(CSBpt[p, t]*e[p, t], p = p) == v[t], t = 2:length(T_setofgameweeks)) |>#4.34
+#    add_constraint(x[p, t-1] + e[p, t] - u[p, t] == x[p, t], p = p, t = 2:length(T_setofgameweeks)) |>  #4.35
+#    add_constraint(e[p, t] + u[p, t] <= 1, p = p, t = t) |>  # 4.36
+#    add_constraint(sum_expr(CBSpt*x[p, t-1] + v[t-1] >= sum_expr(CBSpt[p, t]*x_freehit[p,t], t = 2:length(T_setofgameweeks), p = p))) |> # 4.37
+#    add_constraint(sum_expr(u[p, t] <= E(1-r[t]), p = p, t = 2:length(T_setofgameweeks))) |># 4.38
+#    add_constraint(sum_expr(e[p, t] <= E(1-r[t]), p = p, t = 2:length(T_setofgameweeks)))# 4.39
+# Fungerer ikke
+
+# First, create player-gameweek combinations
+player_gw_combos <- expand.grid(
+  player_id = P_setofplayers,
+  GW = T_setofgameweeks
+)
+
+# Join with data to get values
+player_gw_values <- merge(
+  player_gw_combos,
+  data[, c("player_id", "GW", "value")],
+  by = c("player_id", "GW"),
+  all.x = TRUE
+)
+
+# Replace NA values with a default (5.0)
+player_gw_values$value[is.na(player_gw_values$value)] <- 5.0
+
+# Create indices for coefficient vectors
+player_gw_indices <- paste0(player_gw_values$player_id, "_", player_gw_values$GW)
+
+# Create coefficient vectors for each GW
+player_values <- player_gw_values$value
+names(player_values) <- player_gw_indices
+
+# Initial budget constraint (4.33)
+model <- model %>% 
+  add_constraint(
+    BS - sum_expr(
+      player_values[paste0(p, "_", 1)] * x[p, 1],
+      p = p
+    ) == v[1]
   )
 
-print("Objective function defined in the 'ompr' model.")
-# You can inspect the objective function part of the model (optional)
-objective_function(model)
+# For the remaining gameweeks (4.34-4.39)
+for (gw in T_setofgameweeks) {
+  if (gw > 1) {
+    # Budget evolution (4.34)
+    model <- model %>%
+      add_constraint(
+        v[gw-1] + 
+        sum_expr(
+          player_values[paste0(p, "_", gw)] * u[p, gw],
+          p = p
+        ) - 
+        sum_expr(
+          player_values[paste0(p, "_", gw)] * e[p, gw],
+          p = p
+        ) == v[gw]
+      )
+    
+    # Squad continuity (4.35)
+    model <- model %>%
+      add_constraint(
+        x[p, gw] == x[p, gw-1] - u[p, gw] + e[p, gw],
+        p = p
+      )
+    
+    # Free Hit budget constraint (4.37) Reversed
+    model <- model %>%
+      add_constraint(
+        sum_expr(
+          player_values[paste0(p, "_", gw)] * x_freehit[p, gw],
+          p = p
+        ) <= 
+        sum_expr(
+          player_values[paste0(p, "_", gw-1)] * x[p, gw-1],
+          p = p
+        ) + v[gw-1]
+      )
+    
+    # Free Hit transfer restrictions (4.38-4.39)
+    model <- model %>%
+      add_constraint(
+        sum_expr(u[p, gw], p = p) <= E * (1 - r[gw])
+      ) %>%
+      add_constraint(
+        sum_expr(e[p, gw], p = p) <= E * (1 - r[gw])
+      )
+  }
+}
+
+# Transfer limitation (4.36) - This applies to all gameweeks
+model <- model %>%
+  add_constraint(
+    e[p, t] + u[p, t] <= 1,
+    p = p, t = t
+  )
+
+# Transfer Constraints 4.40 - 4.44
+
+
+
+
+# Obj. Funct. Ch.5
+#model <- model |>
+#    set_objective(
+#  sum_expr(
+#    (data$total_points[p] * y[p, t]) +           # Startoppstilling
+#    (data$total_points[p] * f[p, t]) +           # Kaptein
+#    (epsilon * data$total_points[p] * h[p, t]) + # Visekaptein
+#    sum_expr(kappa[l] * data$total_points[p] * g[p, t, l], l = L_substitution) + # Innbyttere
+#    (2 * data$total_points[p] * c[p, t]),        # Triple Captain
+#    p = p, t = t
+#  ) - R * sum_expr(alpha[t], t = t),  # Straff for overføringer
+#  sense = "max"
+#)
+
+
+
 
