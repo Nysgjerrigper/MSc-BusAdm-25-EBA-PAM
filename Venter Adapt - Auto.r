@@ -7,9 +7,9 @@ library(tidyr)
 library(slam)
 
 # --- 1. User Inputs & FPL Constants ---
-START_GW <- 2                 # <<< SET THE STARTING GAMEWEEK >>>
-END_GW <- 10                  # <<< SET THE END GAMEWEEK (for automated rolling horizon) >>>
-PLANNING_HORIZON <- 2       # <<< PLANNING HORIZON FOR EACH GW >>>
+START_GW <- 105      # <<< SET THE STARTING GAMEWEEK >>>
+END_GW <- 105                # <<< SET THE END GAMEWEEK (for automated rolling horizon) >>>
+PLANNING_HORIZON <- 0       # <<< PLANNING HORIZON FOR EACH GW >>>
 
 TOTAL_BUDGET <- 1000
 SQUAD_SIZE <- 15
