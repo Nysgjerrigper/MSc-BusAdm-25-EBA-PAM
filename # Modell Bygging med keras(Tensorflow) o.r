@@ -1,16 +1,10 @@
 # Modell Bygging med keras(Tensorflow) og R
-rm(list = ls())
+rm(list = ls(all = TRUE))
 
-library(reticulate)
 library(keras)
-# library(keras3)
-library(tidyverse)
 library(tensorflow)
-tf$constant("Hello TensorFlow!")
+library(tidyverse)
+# Henter data (lokalt)
 
-# Install Keras3
-install.packages("keras3")
-keras::install_keras(backend = "tensorflow")
+data <- read_csv("Differensiert gw alle tre sesonger(22-24), heltall.csv")
 
-# Load data
-sesong22 <- read_csv("Sesong 22 til 23.csv")
