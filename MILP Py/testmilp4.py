@@ -10,13 +10,13 @@ import math # Added for potential rounding if needed
 # Dette skriptet har med rullerende horisont
 
 # --- Input Parameters ---
-START_GAMEWEEK = 1
-MAX_GAMEWEEK = 10  # Set to the desired maximum gameweek for the whole run
-SUB_HORIZON_LENGTH = 2 # Number of GWs to look ahead (including current) in each step
+START_GAMEWEEK = 38+37
+MAX_GAMEWEEK =  38+37+10# Set to the desired maximum gameweek for the whole run
+SUB_HORIZON_LENGTH = 1 # Number of GWs to look ahead (including current) in each step
 # *** IMPORTANT: Update this path to your actual file location ***
 CSV_FILE_PATH = "C:/Users/peram/Documents/test/Differensiert gw alle tre sesonger(22-24), heltall.csv"
 onemin = 60
-SOLVER_TIME_LIMIT = onemin * 4  # Seconds (e.g., 900 for 15 mins per subproblem) or None
+SOLVER_TIME_LIMIT = onemin * 1  # Seconds (e.g., 900 for 15 mins per subproblem) or None
 PROGRESS_UPDATE_INTERVAL = 30 # Seconds (shorter interval might be useful)
 
 # --- Check Versions ---
