@@ -244,8 +244,9 @@ stigenderekkefølge <- stigenderekkefølge %>%
   mutate(player_id = as.integer(factor(name)))
 
 ### Alternativt ====
+alternativtsammensatt <- bind_rows(Alt_22_23, Alt_23_24, Alt_24_25)
 
-alternativtsammensatt <- stigenderekkefølge %>%
+alternativtsammensatt <- alternativtsammensatt %>%
   mutate(
     kickoff_time = as.POSIXct(kickoff_time, format = "%Y-%m-%dT%H:%M:%SZ", tz = "UTC"),
     player_id = as.integer(factor(name)),         # Unique global player IDs
@@ -253,7 +254,7 @@ alternativtsammensatt <- stigenderekkefølge %>%
     tID = as.integer(factor(team)),           # Unique team IDs
     hID = as.integer(was_home)                # Home/away indicator
   ) %>%
-  arrange(pID, kickoff_time) %>%  # Arrange by the new pID and kickoff_time
+  arrange(player_id, kickoff_time) %>%  # Arrange by the new pID and kickoff_time
   mutate(row_id = row_number())   # Create a row identifier
 
 # Lagre data =====
@@ -274,5 +275,5 @@ cat("Lagret filen\n")
 write_csv(stigenderekkefølge, "Stigende GW, alle tre sesonger(22-24).csv")
 
 # Alternativt Datasett 
-write_csv(alternativsammensatt, "Ekstra kolonner, stigende GW, alle tre sesonger(22-24), heltall.csv")
+write_csv(alternativtsammensatt, "Ekstra kolonner, stigende GW, alle tre sesonger(22-24), heltall.csv")
 cat("Lagret alternativ filen\n")
