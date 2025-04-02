@@ -198,7 +198,7 @@ except NotImplementedError:
     threads_to_use = 4
 # Ensure timeLimit is integer or None
 solver_time_limit_int = int(SOLVER_TIME_LIMIT) if SOLVER_TIME_LIMIT is not None else None
-solver = pulp.PULP_CBC_CMD(threads=threads_to_use, msg=True, timeLimit=solver_time_limit_int)
+solver = pulp.PULP_CBC_CMD(msg=True, timeLimit=solver_time_limit_int)
 #solver = pulp.GLPK_CMD(msg=True, timeLimit=solver_time_limit_int)
 
 # --- Rolling Horizon Loop ---

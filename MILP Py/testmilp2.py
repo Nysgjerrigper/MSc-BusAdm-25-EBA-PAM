@@ -7,11 +7,11 @@ import os
 import threading
 # Med start GW
 # --- Input Parameters ---
-START_GAMEWEEK = 1 # <--- ADD THIS: Set to the desired starting gameweek (e.g., 1, 5, etc.)
-MAX_GAMEWEEK = 2 # Set to the desired maximum gameweek (e.g., 38 for full season)
+START_GAMEWEEK = 9 # <--- ADD THIS: Set to the desired starting gameweek (e.g., 1, 5, etc.)
+MAX_GAMEWEEK = 10 # Set to the desired maximum gameweek (e.g., 38 for full season)
 CSV_FILE_PATH = "C:/Users/peram/Documents/test/Differensiert gw alle tre sesonger(22-24), heltall.csv"
-SOLVER_TIME_LIMIT = None  # Seconds (e.g., 3600 for 1 hour) or None for no limit
-PROGRESS_UPDATE_INTERVAL = 60 # Seconds
+SOLVER_TIME_LIMIT = 15 # Seconds (e.g., 3600 for 1 hour) or None for no limit
+PROGRESS_UPDATE_INTERVAL = 120 # Seconds
 
 # --- Check Versions ---
 print(f"--- Running on Python {sys.version} ---")
@@ -156,7 +156,7 @@ print(f"  Gameweek halves: FH <= {medianavgameweeks}, SH > {medianavgameweeks}")
 # Define Parameters
 print("Defining model parameters...")
 R = 4; MK = 2; MD = 5; MM = 5; MF = 3; MC = 3; E = 11; EK = 1
-ED = 3; EM = 2; EF = 1; BS = 1000.0 # Scaled
+ED = 3; EM = 3; EF = 1; BS = 1000.0 # Scaled
 phi = (MK + MD + MM + MF) - E; phi_K = MK - EK
 Q_bar = 2; Q_under_bar = 1
 epsilon = 0.1; kappa = {1: 0.01, 2: 0.005, 3: 0.001}

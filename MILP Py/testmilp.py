@@ -7,7 +7,7 @@ import sys # Import sys to check Python version
 # --- Input Parameters ---
 # Set the maximum gameweek to include in the analysis
 # Smaller number = faster testing, larger number = full analysis
-MAX_GAMEWEEK = 38 # Adjust this value as needed (e.g., 38 for a full season)
+MAX_GAMEWEEK = 8 # Adjust this value as needed (e.g., 38 for a full season)
 CSV_FILE_PATH = "C:/Users/peram/Documents/test/Differensiert gw alle tre sesonger(22-24), heltall.csv"
 
 # --- Check Python Version ---
