@@ -7,18 +7,17 @@ import os
 import math # Used for rounding FT
 
 # --- Input Parameters ---
-START_GAMEWEEK = 8 # Example: Start of the 2nd season in a 3-season file
-MAX_GAMEWEEK = 38   # Run for a few GWs
-SUB_HORIZON_LENGTH = 3 # Keep it simple for debugging
+START_GAMEWEEK = 37+38 # Example: Start of the 2nd season in a 3-season file
+MAX_GAMEWEEK = 37+38+29  # Run for a few GWs
+SUB_HORIZON_LENGTH = 1 # Keep it simple for debugging
 # *** IMPORTANT: Update this path to your actual file location ***
-CSV_FILE_PATH = "C:/Users/peram/Documents/test/Differensiert gw alle tre sesonger(22-24), heltall.csv"
+CSV_FILE_PATH = "C:/Users/peram/Documents/test/Stigende GW, alle tre sesonger(22-24).csv"
 # --- SET TIMELIMIT HERE ---
-SOLVER_TIME_LIMIT = 5  # Seconds (e.g., 15 seconds for testing)
+SOLVER_TIME_LIMIT = 30  # Seconds (e.g., 15 seconds for testing)
 # --- Define solver WITH timeLimit ---
 solver_to_use = pulp.PULP_CBC_CMD(
     msg=True,
     timeLimit=SOLVER_TIME_LIMIT, # Pass timeLimit here
-    #threads=os.cpu_count()-1 if os.cpu_count() and os.cpu_count() > 1 else 1
 )
 
 print(f"--- Running on Python {sys.version} ---")
@@ -583,7 +582,7 @@ for current_gw in range(START_GAMEWEEK, MAX_GAMEWEEK + 1):
     print("-" * 50)
 
 # --- Post-Loop: Process and Display Results ---
-# ... (Post-loop processing is correct) ...
+
 print("\n" + "="*20 + " Final Rolling Horizon Results " + "="*20)
 if not master_results:
     print("No results were generated.")
