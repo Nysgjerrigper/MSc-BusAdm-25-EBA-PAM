@@ -7,13 +7,13 @@ import os
 import math # Used for rounding FT
 
 # --- Input Parameters ---
-START_GAMEWEEK = 37+38 # Example: Start of the 2nd season in a 3-season file
+START_GAMEWEEK = 37+38+1 # Example: Start of the 2nd season in a 3-season file
 MAX_GAMEWEEK = 37+38+29  # Run for a few GWs
-SUB_HORIZON_LENGTH = 1 # Keep it simple for debugging
+SUB_HORIZON_LENGTH = 2 # Keep it simple for debugging
 # *** IMPORTANT: Update this path to your actual file location ***
 CSV_FILE_PATH = "C:/Users/peram/Documents/test/Stigende GW, alle tre sesonger(22-24).csv"
 # --- SET TIMELIMIT HERE ---
-SOLVER_TIME_LIMIT = 30  # Seconds (e.g., 15 seconds for testing)
+SOLVER_TIME_LIMIT = None  # Seconds (e.g., 15 seconds for testing)
 # --- Define solver WITH timeLimit ---
 solver_to_use = pulp.PULP_CBC_CMD(
     msg=True,
@@ -44,7 +44,7 @@ print("Initial data shape:", allesesonger.shape)
 
 # --- Data Pre-processing and Filtering ---
 print("\n--- Pre-processing Data ---")
-essential_input_cols = ['player_id', 'GW', 'name', 'position', 'team', 'total_points', 'value']
+essential_input_cols = ['player_id', 'GW', 'name', 'position', 'team', 'xP', 'value']
 # ... (rest of pre-processing is correct, including scaling) ...
 # Ensure GW and value are numeric
 try:
@@ -434,7 +434,11 @@ for current_gw in range(START_GAMEWEEK, MAX_GAMEWEEK + 1):
         model += q[t_curr_sub] <= q_normal_calc + M_q * chip_active_prev, f"FT_Evo_Normal_Upper1_{t_curr_sub}"
         model += q[t_curr_sub] <= Q_bar + M_q * chip_active_prev, f"FT_Evo_Normal_Upper2_{t_curr_sub}"
         model += alpha[t_prev_sub] <= M_alpha * (Q_bar - q[t_curr_sub] + epsilon_q), f"Transfer_NoPaidIfMaxFT_{t_prev_sub}"
-
+# Eksplisitt alltid like mange overganger ut og inn
+    print("  Adding Explicit Transfer Balance constraint...")
+    for t_ in t_sub:
+        # Ensure total transfers in equals total transfers out for each week
+        model += pulp.lpSum(e[p_][t_] for p_ in p) == pulp.lpSum(u[p_][t_] for p_ in p), f"Transfer_Balance_{t_}"
     print(f"Constraints added in {time.time() - cons_start:.2f}s")
 
     # 7. Solve Sub-Problem
