@@ -9,12 +9,12 @@ library(ompr); library(ompr.roi); library(ROI.plugin.glpk)
 #citation("keras3");citation("tensorflow");citation("ompr")
 
 # Forsøker på en sesong først for å se om det fungerer, Den nyeste sesongen er minst
-allesesonger <- read_csv("Differensiert gw alle tre sesonger(22-24), heltall.csv")
+allesesonger <- read_csv("Stigende GW, alle tre sesonger(22-24).csv")
 
 #length(unique(allesesonger$name)) == length(unique(allesesonger$player_id))
 
 # En hel sesong tar veldig lang tid så derfor prøver jeg først med 3 uker
-data <- allesesonger |> filter(GW <= 2)
+data <- allesesonger |> filter(GW <= 3)
 #data |> filter(name == "Mohamed Salah") |> select(GW, name, player_id, team, position, total_points) # Sjekker at data er riktig
 
 # Set Table 4.1 Kristiansen et al. 2018
@@ -68,7 +68,7 @@ alpha_bar <- length(P_setofplayers) # Tilstrekkelig høy konstant???
 
 # Variabler Tabell 4.5 Kristiansen et al. 2018 ----
 # Initialiser modellen
-model <- MILPModel() %>%
+model <- MILPModel() |>
   
   # ---- Binære variabler (Tabell 4.5) ----
   # Squad selection (x_pt)
@@ -87,7 +87,8 @@ model <- MILPModel() %>%
   add_variable(h[p, t], p = p, t = t, type = "binary") %>%
   
   # Substitutionsprioritet (g_ptl)
-  add_variable(g[p, t, l], p = p, t = t, l = L_substitution, type = "binary") %>%
+  add_variable(g[p_ngk, t, l], p_ngk = P_not_gk, t = t, l = L_substitution, type = "binary") %>%
+  #add_variable(g[p, t, l], p = p, t = t, l = L_substitution, type = "binary") %>%
   
   # Transfers out (u_pt)
   add_variable(u[p, t], p = p, t = t, type = "binary") %>%
@@ -173,10 +174,16 @@ model <- model %>%
 
 model <- model |>    
     # Free Hit Only Constraints 4.13 - 4.17
-    add_constraint(sum_expr(x_freehit[p, t], p = p) == MK*r[t], t = t) %>% 
-    add_constraint(sum_expr(x_freehit[p, t], p = p) == MD*r[t], t = t) %>% 
-    add_constraint(sum_expr(x_freehit[p, t], p = p) == MM*r[t], t = t) %>% 
-    add_constraint(sum_expr(x_freehit[p, t], p = p) == MF*r[t], t = t)
+    #add_constraint(sum_expr(x_freehit[p, t], p = p) == MK*r[t], t = t) %>% 
+    #add_constraint(sum_expr(x_freehit[p, t], p = p) == MD*r[t], t = t) %>% 
+    #add_constraint(sum_expr(x_freehit[p, t], p = p) == MM*r[t], t = t) %>% 
+    #add_constraint(sum_expr(x_freehit[p, t], p = p) == MF*r[t], t = t)
+add_constraint(sum_expr(x_freehit[p_gk, t], p_gk = Pgk) == MK * r[t], t = t) %>%
+add_constraint(sum_expr(x_freehit[p_def, t], p_def = Pdef) == MD * r[t], t = t) %>%
+add_constraint(sum_expr(x_freehit[p_mid, t], p_mid = Pmid) == MM * r[t], t = t) %>%
+add_constraint(sum_expr(x_freehit[p_fwd, t], p_fwd = Pfwd) == MF * r[t], t = t) %>%
+# Also add the total size constraint (optional but good practice)
+add_constraint(sum_expr(x_freehit[p, t], p = p) == (MK + MD + MM + MF) * r[t], t = t) %>%
 
 # Then add team constraints in a separate loop
 for (team_name in C_setofteams) {
@@ -209,16 +216,26 @@ model <- model |>
 
 ## Captain and vice-captain constraints (4.27-4.29) ----
 model <- model |> 
-    add_constraint(sum_expr(f[p, t]) + sum_expr(c[p,t])== 1,p = p, t = t) %>% # Only one cap per gw
-    add_constraint(sum_expr(h[p, t], p = p) == 1, t = t) %>% # Samma som over for Vise kap
-    add_constraint(f[p, t] + c[p, t] + h[p, t] <= y[p, t], p = p, t = t) # Either cap, vc or 3xcap in one gw
+    #add_constraint(sum_expr(f[p, t]) + sum_expr(c[p,t])== 1,p = p, t = t) %>% # Only one cap per gw
+    #add_constraint(sum_expr(h[p, t], p = p) == 1, t = t) %>% # Samma som over for Vise kap
+    #add_constraint(f[p, t] + c[p, t] + h[p, t] <= y[p, t], p = p, t = t) # Either cap, vc or 3xcap in one gw
+# 4.27: One Captain OR Triple Captain per week
+add_constraint(sum_expr(f[p, t], p = p) + sum_expr(c[p, t], p = p) == 1, t = t) %>%
+# 4.28: One Vice-Captain per week
+add_constraint(sum_expr(h[p, t], p = p) == 1, t = t) %>%
+# 4.29: Captaincy only for starting players
+add_constraint(f[p, t] + c[p, t] + h[p, t] <= y[p, t], p = p, t = t) %>%
+
 
 ## Substitution constraints (4.30-4.32) ----
 model <- model |>
-    add_constraint( y[p, t] + sum_expr(g[p, t, l], l = l) <= x[p, t] + beta*r[t], p = P_not_gk, t = t) %>% #4.30
-    add_constraint( y[p, t] + sum_expr(g[p, t, l], l = l) <= x_freehit[p, t] + beta*(1-r[t]), p = P_not_gk, t = t) %>% #4.31
-    add_constraint(sum_expr(g[p, t, l] ,p = P_not_gk) <= 1, t = t, l = l) #4.32
-
+    #add_constraint( y[p, t] + sum_expr(g[p, t, l], l = l) <= x[p, t] + beta*r[t], p = P_not_gk, t = t) %>% #4.30
+    #add_constraint( y[p, t] + sum_expr(g[p, t, l], l = l) <= x_freehit[p, t] + beta*(1-r[t]), p = P_not_gk, t = t) %>% #4.31
+    #add_constraint(sum_expr(g[p, t, l] ,p = P_not_gk) <= 1, t = t, l = l) #4.32
+# Iterate over non-goalkeepers for these constraints
+add_constraint( y[p_ngk, t] + sum_expr(g[p_ngk, t, l], l = l) <= x[p_ngk, t] + beta*r[t], p_ngk = P_not_gk, t = t) %>% # 4.30
+add_constraint( y[p_ngk, t] + sum_expr(g[p_ngk, t, l], l = l) <= x_freehit[p_ngk, t] + beta*(1-r[t]), p_ngk = P_not_gk, t = t) %>% # 4.31
+add_constraint(sum_expr(g[p_ngk, t, l], p_ngk = P_not_gk) <= 1, t = t, l = l) # 4.32
 ## Budget Constraints # 4.33-4.36 !!!! MULIG FEIL
 
 
@@ -393,27 +410,116 @@ model <- model %>%
     sum_expr(2 * player_points[paste0(p, "_", t)] * c[p, t], p = p, t = t) + 
     
     # Sub points (priority 1)
-    sum_expr(kappa[1] * player_points[paste0(p, "_", t)] * g[p, t, 1], p = p, t = t) + 
+    sum_expr(kappa[1] * player_points[paste0(p, "_", t)] * g[p_ngk, t, 1], p_ngk = P_not_gk, t = t) + 
     
     # Sub points (priority 2)
-    sum_expr(kappa[2] * player_points[paste0(p, "_", t)] * g[p, t, 2], p = p, t = t) + 
+    sum_expr(kappa[2] * player_points[paste0(p, "_", t)] * g[p_ngk, t, 2], p_ngk = P_not_gk, t = t) + 
     
     # Sub points (priority 3)
-    sum_expr(kappa[3] * player_points[paste0(p, "_", t)] * g[p, t, 3], p = p, t = t) - 
+    sum_expr(kappa[3] * player_points[paste0(p, "_", t)] * g[p_ngk, t, 3], p_ngk = P_not_gk, t = t)  
     
     # Transfer penalties
-    R * sum_expr(alpha[t], t = t),
+    - R * sum_expr(alpha[t], t = t),
     
     sense = "max"
   )
 
-
 print(model)  # Check total number of constraints
 
+# --- Solve the model ---
+result <- solve_model(model, with_ROI(solver = "glpk", verbose = TRUE)) # Keep verbose=TRUE for solver logs
 
-# Solve the model
-result <- solve_model(model, with_ROI(solver = "glpk"))
+# --- Extract and Print Results ---
+if (result$status == "optimal" || result$status == "success") {
 
+  print(paste("Solver Status:", result$status))
+  print(paste("Objective Value:", result$objective_value))
 
+  # Get player info for mapping IDs to names
+  player_info <- data %>%
+    distinct(player_id, .keep_all = TRUE) %>%
+    select(player_id, name, position, team)
 
+  # Loop through gameweeks to show results
+  for (t_gw in t) {
+    print(paste("\n--- Gameweek", t_gw, "Results ---"))
 
+    # Extract Squad (x variables = 1)
+    # The columns in the output of get_solution match the index names: 'p', 't'
+    squad_solution <- get_solution(result, x[p, t_gw]) %>% # Use 'p' as the index name
+      filter(value > 0.9) %>%
+      select(p) %>% # Select the column named 'p'
+      mutate(p = as.numeric(p)) %>% # Ensure player_id is numeric for joining
+      left_join(player_info, by = c("p" = "player_id")) # Join using the 'p' column
+
+    print("Squad:")
+    print(squad_solution)
+
+    # Extract Lineup (y variables = 1)
+    lineup_solution <- get_solution(result, y[p, t_gw]) %>% # Use 'p'
+      filter(value > 0.9) %>%
+      select(p) %>% # Use 'p'
+      mutate(p = as.numeric(p)) %>%
+      left_join(player_info, by = c("p" = "player_id"))
+
+    print("Lineup:")
+    print(lineup_solution)
+
+    # Extract Captain (f variables = 1)
+    captain_solution <- get_solution(result, f[p, t_gw]) %>% # Use 'p'
+      filter(value > 0.9) %>%
+      select(p) %>% # Use 'p'
+      mutate(p = as.numeric(p)) %>%
+      left_join(player_info, by = c("p" = "player_id"))
+
+    print("Captain:")
+    if(nrow(captain_solution) > 0) print(captain_solution) else print("None")
+
+    # Extract Vice-Captain (h variables = 1)
+    vice_captain_solution <- get_solution(result, h[p, t_gw]) %>% # Use 'p'
+      filter(value > 0.9) %>%
+      select(p) %>% # Use 'p'
+      mutate(p = as.numeric(p)) %>%
+      left_join(player_info, by = c("p" = "player_id"))
+
+    print("Vice-Captain:")
+     if(nrow(vice_captain_solution) > 0) print(vice_captain_solution) else print("None")
+
+    # Extract Transfers (e and u variables = 1)
+     transfers_in_solution <- get_solution(result, e[p, t_gw]) %>% # Use 'p'
+       filter(value > 0.9) %>%
+       select(p) %>% # Use 'p'
+       mutate(p = as.numeric(p)) %>%
+       left_join(player_info, by = c("p" = "player_id"))
+
+     print("Transfers In:")
+     if(nrow(transfers_in_solution) > 0) print(transfers_in_solution) else print("None")
+
+     transfers_out_solution <- get_solution(result, u[p, t_gw]) %>% # Use 'p'
+       filter(value > 0.9) %>%
+       select(p) %>% # Use 'p'
+       mutate(p = as.numeric(p)) %>%
+       left_join(player_info, by = c("p" = "player_id"))
+
+     print("Transfers Out:")
+     if(nrow(transfers_out_solution) > 0) print(transfers_out_solution) else print("None")
+
+    # Extract Budget (v variable) - Index is 't'
+    budget_solution <- get_solution(result, v[t_gw]) %>%
+       select(value) # Just get the value
+
+    print("Remaining Budget:")
+    if(nrow(budget_solution) > 0) print(budget_solution$value) else print("N/A")
+
+    # Extract Penalized Transfers (alpha variable) - Index is 't'
+    alpha_solution <- get_solution(result, alpha[t_gw]) %>%
+       select(value) # Just get the value
+
+    print("Penalized Transfers (alpha):")
+    if(nrow(alpha_solution) > 0) print(round(alpha_solution$value)) else print("N/A") # Round alpha
+
+  }
+
+} else {
+  print(paste("Solver failed with status:", result$status))
+}

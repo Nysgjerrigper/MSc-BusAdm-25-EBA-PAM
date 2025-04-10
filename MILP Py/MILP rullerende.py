@@ -9,7 +9,7 @@ import math # Used for rounding FT
 # --- Input Parameters ---
 START_GAMEWEEK = 37+38+1 # Example: Start of the 2nd season in a 3-season file
 MAX_GAMEWEEK = 37+38+29  # Run for a few GWs
-SUB_HORIZON_LENGTH = 2 # Keep it simple for debugging
+SUB_HORIZON_LENGTH =  1 # Keep it simple for debugging
 # *** IMPORTANT: Update this path to your actual file location ***
 CSV_FILE_PATH = "C:/Users/peram/Documents/test/Stigende GW, alle tre sesonger(22-24).csv"
 # --- SET TIMELIMIT HERE ---
@@ -75,7 +75,6 @@ for col in ['team', 'position', 'name']:
 
 
 # --- 1. Data Cleaning & FULL Set Definition ---
-# ... (rest of data cleaning and set definition is correct) ...
 print("\n--- 1. Data Cleaning & FULL Set Definition ---")
 # Define initial FULL sets
 T_setofgameweeks_full = sorted(data_full_range['GW'].unique())
