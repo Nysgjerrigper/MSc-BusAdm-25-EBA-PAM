@@ -8,11 +8,11 @@ import math # Used for rounding FT
 # Removed threading import
 
 # --- Input Parameters ---
-START_GAMEWEEK = 77 # Example: Start of the 3rd season (1+38+38)
-MAX_GAMEWEEK = 77+28 # Example: Run for a few GWs for testing
-SUB_HORIZON_LENGTH = 28 # Look ahead N weeks
-# *** IMPORTANT: Update this path to your actual file location ***
-CSV_FILE_PATH = "C:/Users/peram/Documents/test/Stigende GW, alle tre sesonger(22-24).csv" # <<< POINT TO RAW, NON-AGGREGATED FILE
+CSV_FILE_PATH = "C:/Users/peram/Documents/test/Datasett/Validation_Predictions_Clean (2).csv" # <<< POINT TO RAW, NON-AGGREGATED FILE
+
+START_GAMEWEEK = 80 # Example: Start of the 3rd season (1+38+38)
+MAX_GAMEWEEK = 85 # Example: Run for a few GWs for testing
+SUB_HORIZON_LENGTH = 5 # Look ahead N weeks
 # --- SET TIMELIMIT HERE ---
 SOLVER_TIME_LIMIT = None  # Seconds (e.g., 600 for 10 mins) or None for no limit
 # PROGRESS_UPDATE_INTERVAL = 60 # Removed
@@ -59,7 +59,7 @@ print("Initial raw data shape:", allesesonger.shape)
 
 # --- Data Pre-processing and Filtering ---
 print("\n--- Pre-processing Raw Data ---")
-essential_input_cols = ['player_id', 'GW', 'name', 'position', 'team', 'total_points', 'value'] # Adjusted
+essential_input_cols = ['player_id', 'GW', 'name', 'position', 'team', 'predicted_total_points', 'value'] # Adjusted
 missing_cols = [col for col in essential_input_cols if col not in allesesonger.columns]
 if missing_cols:
     print(f"ERROR: Missing essential columns in the raw CSV: {missing_cols}")
@@ -76,6 +76,58 @@ try:
 except ValueError as e:
     print(f"ERROR: Could not convert 'GW' or 'value' column to numeric: {e}")
     sys.exit()
+
+# Add after line 73 (after filling NA values)
+# --- DOUBLE GAMEWEEK HANDLING ---
+print("Checking for double gameweeks and resolving...")
+try:
+    # Find players with multiple appearances in the same gameweek
+    player_gw_counts = allesesonger.groupby(['player_id', 'GW']).size().reset_index(name='appearances')
+    double_gw_entries = player_gw_counts[player_gw_counts['appearances'] > 1]
+    
+    if not double_gw_entries.empty:
+        print(f"Found {len(double_gw_entries)} player-gameweek combinations with multiple appearances")
+        
+        # Check for potential inconsistencies in double gameweeks
+        inconsistencies = []
+        for _, row in double_gw_entries.iterrows():
+            player_id, gw = row['player_id'], row['GW']
+            player_gw_data = allesesonger[(allesesonger['player_id'] == player_id) & (allesesonger['GW'] == gw)]
+            
+            # Check if position or name is inconsistent
+            if player_gw_data['position'].nunique() > 1:
+                inconsistencies.append(f"Player ID {player_id} has different positions in GW {gw}")
+            
+            # Check if team is different (this could be valid for mid-season transfers)
+            if player_gw_data['team'].nunique() > 1:
+                teams = ", ".join(player_gw_data['team'].unique())
+                player_name = player_gw_data['name'].iloc[0]
+                print(f"NOTE: Player {player_name} (ID {player_id}) appears for multiple teams in GW {gw}: {teams}")
+        
+        if inconsistencies:
+            print("WARNING: Found inconsistencies in double gameweek data:")
+            for issue in inconsistencies:
+                print(f"  - {issue}")
+        
+        # Perform the aggregation with necessary handling
+        print("Aggregating double gameweeks...")
+        # Define which columns to sum and which to keep first value
+        sum_cols = ['predicted_total_points', 'actual_total_points'] if 'actual_total_points' in allesesonger.columns else ['predicted_total_points']
+        first_cols = ['name', 'position', 'team', 'value']
+        
+        # Create aggregation dictionary
+        agg_dict = {col: 'sum' for col in sum_cols}
+        agg_dict.update({col: 'first' for col in first_cols if col in allesesonger.columns})
+        
+        # Group and aggregate
+        allesesonger = allesesonger.groupby(['player_id', 'GW'], as_index=False).agg(agg_dict)
+        print(f"Data shape after double gameweek aggregation: {allesesonger.shape}")
+    else:
+        print("No double gameweeks found in the data")
+        
+except Exception as e:
+    print(f"WARNING: Error during double gameweek processing: {e}")
+    print("Continuing with original data without double gameweek aggregation")
 
 # Filter Gameweeks for the entire run horizon
 data_load_start_gw = START_GAMEWEEK - 1 if START_GAMEWEEK > 1 else START_GAMEWEEK
@@ -115,13 +167,13 @@ data_merged_full = data_merged_full[[col for col in data_merged_full.columns if 
 data_merged_full.sort_values(by=['player_id', 'GW'], inplace=True)
 essential_info_cols = ['name', 'position', 'team']
 for col in essential_info_cols: data_merged_full[col] = data_merged_full.groupby('player_id')[col].transform(lambda x: x.ffill().bfill())
-data_merged_full['total_points'] = data_merged_full['total_points'].fillna(0)
+data_merged_full['predicted_total_points'] = data_merged_full['predicted_total_points'].fillna(0)
 data_merged_full['value'] = data_merged_full.groupby('player_id')['value'].transform(lambda x: x.ffill().bfill())
 data_merged_full['value'] = data_merged_full['value'].fillna(50.0)
 
 # --- AGGREGATION FOR DGWs --- # <<<< THIS BLOCK IS KEPT
 print("Aggregating data for Double Gameweeks...")
-sum_cols = ['total_points', 'minutes', 'goals_scored', 'assists', 'bonus', 'bps', 'saves', 'penalties_saved'] # Add/remove as needed
+sum_cols = ['predicted_total_points', 'minutes', 'goals_scored', 'assists', 'bonus', 'bps', 'saves', 'penalties_saved'] # Add/remove as needed
 first_cols = ['value', 'name', 'position', 'team']
 group_cols = ['player_id', 'GW']
 agg_funcs = {}
@@ -199,7 +251,7 @@ print("Parameters defined.")
 print("Preparing full coefficient matrices...")
 try:
     # Use data_cleaned_full which is now aggregated
-    points_matrix_df = data_cleaned_full.pivot(index='player_id', columns='GW', values='total_points')
+    points_matrix_df = data_cleaned_full.pivot(index='player_id', columns='GW', values='predicted_total_points')
     value_matrix_df = data_cleaned_full.pivot(index='player_id', columns='GW', values='value')
     # Reindex using the final player set 'p' and the relevant gameweeks 'T_setofgameweeks_full'
     points_matrix_df = points_matrix_df.reindex(index=p, columns=T_setofgameweeks_full, fill_value=0.0)
@@ -382,7 +434,7 @@ for current_gw in range(START_GAMEWEEK, MAX_GAMEWEEK + 1):
     # Link budget and squad for t1_sub
     if current_gw == START_GAMEWEEK:
         # Constraint 4.33: Initial budget limit (Use <= to allow saving budget)
-        model += v[t1_sub] + pulp.lpSum(value_sub.loc[p_, t1_sub] * x[p_][t1_sub] for p_ in p) <= BS, f"Budget_Initial_{t1_sub}"
+        model += v[t1_sub] + pulp.lpSum(value_sub.loc[p_, t1_sub] * x[p_][t1_sub]) <= BS, f"Budget_Initial_{t1_sub}"
         # No transfers possible in GW1, force e=u=0
         model += pulp.lpSum(e[p_][t1_sub] for p_ in p) == 0, f"No_Transfers_In_StartGW"
         model += pulp.lpSum(u[p_][t1_sub] for p_ in p) == 0, f"No_Transfers_Out_StartGW"
@@ -653,7 +705,7 @@ else:
 
     # Save results
     try:
-        output_csv_name = "Squad Selection MIPL-GC.csv"
+        output_csv_name = f"Squad Selection MILP-GC, W{START_GAMEWEEK}-{MAX_GAMEWEEK},SHL{SUB_HORIZON_LENGTH}.csv"
         results_df_to_save = results_df_named.copy() # Use named df for saving
         for col in id_list_columns:
              if col in results_df_to_save.columns:

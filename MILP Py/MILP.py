@@ -7,11 +7,11 @@ import os
 import math # Used for rounding FT
 
 # --- Input Parameters ---
-START_GAMEWEEK = 37+38+1 # Example: Start of the 2nd season in a 3-season file
-MAX_GAMEWEEK = 37+38+29  # Run for a few GWs
-SUB_HORIZON_LENGTH = 29 # Keep it simple for debugging
+START_GAMEWEEK = 80 # Example: Start of the 2nd season in a 3-season file
+MAX_GAMEWEEK = 85 # Run for a few GWs
+SUB_HORIZON_LENGTH = 2 # Keep it simple for debugging
 # *** IMPORTANT: Update this path to your actual file location ***
-CSV_FILE_PATH = "C:/Users/peram/Documents/test/Stigende GW, alle tre sesonger(22-24).csv"
+CSV_FILE_PATH = "C:\\Users\\peram\\Documents\\test\\Datasett\\Validation_Predictions_Clean (2).csv"
 # --- SET TIMELIMIT HERE ---
 SOLVER_TIME_LIMIT = None  # Seconds (e.g., 15 seconds for testing)
 # --- Define solver WITH timeLimit ---
@@ -44,7 +44,7 @@ print("Initial data shape:", allesesonger.shape)
 
 # --- Data Pre-processing and Filtering ---
 print("\n--- Pre-processing Data ---")
-essential_input_cols = ['player_id', 'GW', 'name', 'position', 'team', 'xP', 'value']
+essential_input_cols = ['player_id', 'GW', 'name', 'position', 'team', 'predicted_total_points', 'value']
 # ... (rest of pre-processing is correct, including scaling) ...
 # Ensure GW and value are numeric
 try:
@@ -106,7 +106,7 @@ essential_info_cols = ['name', 'position', 'team']
 for col in essential_info_cols:
      data_merged_full[col] = data_merged_full.groupby('player_id')[col].transform(lambda x: x.ffill().bfill())
 
-data_merged_full['total_points'] = data_merged_full['total_points'].fillna(0)
+data_merged_full['predicted_total_points'] = data_merged_full['predicted_total_points'].fillna(0)
 # Fill value based on ffill/bfill - get last known value for a player
 data_merged_full['value'] = data_merged_full.groupby('player_id')['value'].transform(lambda x: x.ffill().bfill())
 data_merged_full['value'] = data_merged_full['value'].fillna(50.0) # Final fallback
@@ -191,7 +191,7 @@ print("Parameters defined.")
 # Prepare Coefficient Data Structures
 print("Preparing full coefficient matrices...")
 try:
-    points_matrix_df = data_cleaned_full.pivot(index='player_id', columns='GW', values='total_points')
+    points_matrix_df = data_cleaned_full.pivot(index='player_id', columns='GW', values='predicted_total_points')
     value_matrix_df = data_cleaned_full.pivot(index='player_id', columns='GW', values='value')
     points_matrix_df = points_matrix_df.reindex(index=p, columns=T_setofgameweeks_full, fill_value=0.0)
     value_matrix_df = value_matrix_df.reindex(index=p, columns=T_setofgameweeks_full)
