@@ -5,11 +5,11 @@ echo Starting FPL Optimization with Multiple Horizon Lengths
 echo =======================================================
 
 REM Define the horizon values to test (from highest to lowest)
-set horizons=2 1 
+set horizons= 3 2 1 
 
 REM Define gameweek range - ADDED THESE TWO LINES
-set start_gw=80
-set max_gw=82
+set start_gw= 77
+set max_gw= 108
 
 REM Create a log file for timing results
 echo Horizon,Start Time,End Time,Duration > timing_results.csv

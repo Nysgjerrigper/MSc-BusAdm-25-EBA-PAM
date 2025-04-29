@@ -29,7 +29,8 @@ library(keras)
 if (!require("pacman")) install.packages("pacman")
 pacman::p_load(ggthemes, tidyverse, slider,
                 slider,glmnet,httr,jsonlite,tensorflow,
-                randomForest, Metrics)
+                randomForest, Metrics, pastecs,
+                stats)
 
 # Check if Keras and TF is properly installed
 tf$constant("Hello, TensorFlow!")
@@ -89,6 +90,292 @@ unscaled_gk <- gk
 unscaled_def <- def
 unscaled_mid <- mid
 unscaled_fwd <- fwd
+
+# EDA ----
+# Where to save plots?
+plot_directory <- "C:/Users/peram/Documents/test/R Forecast/EDA"
+dir.create(plot_directory, recursive = TRUE)
+
+# Define position order for consistent plotting
+position_levels <- c("GK", "DEF", "MID", "FWD")
+
+# Split data by season (assuming alternativsammensatt contains multiple seasons)
+# Filter for season boundaries based on GW
+season_22_23 <- alternativsammensatt |> filter(GW <= 38)
+season_23_24 <- alternativsammensatt |> filter(GW > 38 , GW < 38+38+1)
+
+# Create datasets of starting players
+starters_22_23 <- season_22_23 |> 
+  filter(starts == 1) |> 
+  select(total_points, position) |>
+  mutate(position = factor(position, levels = position_levels))
+
+starters_23_24 <- season_23_24 |> 
+  filter(starts == 1) |> 
+  select(total_points, position) |>
+  mutate(position = factor(position, levels = position_levels))
+
+# Display dataset structure
+glimpse(starters_22_23)
+cat("Position levels consistent between seasons:", 
+    identical(levels(starters_22_23$position), levels(starters_23_24$position)), "\n")
+
+# Create boxplots for point distributions by position for starters
+plot1 <- ggplot(starters_22_23, aes(x = position, y = total_points)) + 
+  geom_boxplot() +
+  labs(title = "Point distribution for starting players in season 22/23", 
+       x = "Position", 
+       y = "Observed points per week") +
+  scale_y_continuous(breaks = seq(0, max(starters_22_23$total_points, na.rm = TRUE), 2)) 
+
+plot2 <- ggplot(starters_23_24, aes(x = position, y = total_points)) +
+  geom_boxplot() +
+  labs(title = "Point distribution for starting players in season 23/24", 
+       x = "Position", 
+       y = "Observed points per week") +
+  scale_y_continuous(breaks = seq(0, max(starters_23_24$total_points, na.rm = TRUE), 2)) 
+
+# Display plots
+plot1
+plot2
+
+# Create datasets of players with at least 15 minutes
+players_15min_22_23 <- season_22_23 |> 
+  filter(minutes >= 15) |> 
+  select(total_points, position) |>
+  mutate(position = factor(position, levels = position_levels))
+
+players_15min_23_24 <- season_23_24 |> 
+  filter(minutes >= 15) |> 
+  select(total_points, position) |>
+  mutate(position = factor(position, levels = position_levels))
+
+# Create boxplots for players with at least 15 minutes
+plot3 <- ggplot(players_15min_22_23, aes(x = position, y = total_points)) + 
+  geom_boxplot() +
+  labs(title = "Point distribution for players with ≥15 minutes (22/23)", 
+       x = "Position", 
+       y = "Observed points per week") +
+  scale_y_continuous(breaks = seq(0, max(players_15min_22_23$total_points, na.rm = TRUE), 2))
+
+plot4 <- ggplot(players_15min_23_24, aes(x = position, y = total_points)) +
+  geom_boxplot() +
+  labs(title = "Point distribution for players with ≥15 minutes (23/24)", 
+       x = "Position", 
+       y = "Observed points per week") +
+  scale_y_continuous(breaks = seq(0, max(players_15min_23_24$total_points, na.rm = TRUE), 2))
+
+# Display plots
+plot3
+plot4
+
+# Save plots starting players
+ggsave(file.path(plot_directory, "Point distribution for starting players in season 22-23.png"), 
+       plot = plot1, width = 8, height = 6)
+ggsave(file.path(plot_directory, "Point distribution for starting players in season 23-24.png"), 
+       plot = plot2, width = 8, height = 6)
+
+# Save plots 15 min play time or more
+ggsave(file.path(plot_directory, "Point distribution for players with 15min+ playing time 22-23.png"), 
+       plot = plot3, width = 8, height = 6)
+ggsave(file.path(plot_directory, "Point distribution for players with 15min+ playing time 23-24.png"), 
+       plot = plot4, width = 8, height = 6)# Hvordan er fordelingen av poeng for spillere som starter?
+
+# Statistical summaries
+# --------------------
+
+# Create statistical summary tables
+stats_starters_22_23 <- stat.desc(starters_22_23$total_points)
+stats_starters_23_24 <- stat.desc(starters_23_24$total_points)
+stats_15min_22_23 <- stat.desc(players_15min_22_23$total_points)
+stats_15min_23_24 <- stat.desc(players_15min_23_24$total_points)
+
+# Combine statistics for comparison
+stats_comparison <- data.frame(
+  Metric = rownames(as.data.frame(stats_starters_22_23)),
+  Starters_22_23 = stats_starters_22_23,
+  Starters_23_24 = stats_starters_23_24,
+  Min15_22_23 = stats_15min_22_23,
+  Min15_23_24 = stats_15min_23_24
+)
+
+print(stats_comparison)
+
+# Distribution density plots for starting players ----
+# Create distribution plots with different colors by position
+dist_plot1 <- ggplot(starters_22_23, aes(x = total_points, fill = position, color = position)) + 
+  geom_density(alpha = 0.2) +
+  scale_color_brewer(palette = "Set1") +
+  scale_fill_brewer(palette = "Set1") +
+  labs(title = "Point distribution for starting players in season 22/23", 
+       x = "Total points", 
+       y = "Density") +
+  theme_minimal() +
+  scale_x_continuous(breaks = seq(0, max(starters_22_23$total_points, na.rm = TRUE), 2))
+
+dist_plot2 <- ggplot(starters_23_24, aes(x = total_points, fill = position, color = position)) + 
+  geom_density(alpha = 0.2) +
+  scale_color_brewer(palette = "Set1") +
+  scale_fill_brewer(palette = "Set1") +
+  labs(title = "Point distribution for starting players in season 23/24", 
+       x = "Total points", 
+       y = "Density") +
+  theme_minimal() +
+  scale_x_continuous(breaks = seq(0, max(starters_23_24$total_points, na.rm = TRUE), 2))
+
+# Display density plots for starters
+dist_plot1
+dist_plot2
+
+# Save density plots for starters
+ggsave(file.path(plot_directory, "Point density distribution for starting players 22-23.png"), 
+       plot = dist_plot1, width = 10, height = 6)
+ggsave(file.path(plot_directory, "Point density distribution for starting players 23-24.png"), 
+       plot = dist_plot2, width = 10, height = 6)
+
+# Distribution plots for players with at least 15 minutes
+dist_plot3 <- ggplot(players_15min_22_23, aes(x = total_points, fill = position, color = position)) + 
+  geom_density(alpha = 0.2) +
+  scale_color_brewer(palette = "Set1") +
+  scale_fill_brewer(palette = "Set1") +
+  labs(title = "Point distribution for players with ≥15 minutes (22/23)", 
+       x = "Total points", 
+       y = "Density") +
+  theme_minimal() +
+  scale_x_continuous(breaks = seq(0, max(players_15min_22_23$total_points, na.rm = TRUE), 2))
+
+dist_plot4 <- ggplot(players_15min_23_24, aes(x = total_points, fill = position, color = position)) + 
+  geom_density(alpha = 0.2) +
+  scale_color_brewer(palette = "Set1") +
+  scale_fill_brewer(palette = "Set1") +
+  labs(title = "Point distribution for players with ≥15 minutes (23/24)", 
+       x = "Total points", 
+       y = "Density") +
+  theme_minimal() +
+  scale_x_continuous(breaks = seq(0, max(players_15min_23_24$total_points, na.rm = TRUE), 2))
+
+# Display density plots for 15+ minute players
+dist_plot3
+dist_plot4
+
+# Save density plots for 15+ minute players
+ggsave(file.path(plot_directory, "Point density distribution for players with 15min+ 22-23.png"), 
+       plot = dist_plot3, width = 10, height = 6)
+ggsave(file.path(plot_directory, "Point density distribution for players with 15min+ 23-24.png"), 
+       plot = dist_plot4, width = 10, height = 6)
+
+# Alternative overlaid distributions (combined in single plots)
+# This shows the direct comparison between seasons for each position
+
+# For starters: Compare 22/23 vs 23/24 by position
+combined_starters <- bind_rows(
+  mutate(starters_22_23, season = "22/23"),
+  mutate(starters_23_24, season = "23/24")
+)
+
+pos_dist_starters <- ggplot(combined_starters, aes(x = total_points, color = season)) + 
+  geom_density(linewidth = 1) +
+  facet_wrap(~ position, scales = "free_y") +
+  scale_color_manual(values = c("22/23" = "#1b9e77", "23/24" = "#d95f02")) +
+  labs(title = "Comparing point distributions across seasons for starting players",
+       x = "Total points",
+       y = "Density") +
+  theme_minimal()
+
+pos_dist_starters
+
+# For 15+ minute players: Compare 22/23 vs 23/24 by position
+combined_15min <- bind_rows(
+  mutate(players_15min_22_23, season = "22/23"),
+  mutate(players_15min_23_24, season = "23/24")
+)
+
+pos_dist_15min <- ggplot(combined_15min, aes(x = total_points, color = season)) + 
+  geom_density(linewidth = 1) +
+  facet_wrap(~ position, scales = "free_y") +
+  scale_color_manual(values = c("22/23" = "#1b9e77", "23/24" = "#d95f02")) +
+  labs(title = "Comparing point distributions across seasons for players with ≥15 minutes",
+       x = "Total points",
+       y = "Density") +
+  theme_minimal()
+
+pos_dist_15min
+
+# Save the combined comparison plots
+ggsave(file.path(plot_directory, "Season comparison starters by position.png"), 
+       plot = pos_dist_starters, width = 10, height = 8)
+ggsave(file.path(plot_directory, "Season comparison 15min+ by position.png"), 
+       plot = pos_dist_15min, width = 10, height = 8)
+       
+# QQ Plots to check normality
+# --------------------------
+
+# QQ Plot for starters 22/23
+png(file.path(plot_directory, "QQ Plot of Starters 22-23 Points.png"), width = 800, height = 600)
+qqnorm(starters_22_23$total_points, col = "blue", pch = 20,
+       main = "Q-Q Plot of Starters 22/23 Points",
+       xlab = "Theoretical Quantiles",
+       ylab = "Sample Quantiles")
+qqline(starters_22_23$total_points, col = "red", lwd = 2)
+dev.off()
+
+# QQ Plot for starters 23/24
+png(file.path(plot_directory, "QQ Plot of Starters 23-24 Points.png"), width = 800, height = 600)
+qqnorm(starters_23_24$total_points, col = "blue", pch = 20,
+       main = "Q-Q Plot of Starters 23/24 Points",
+       xlab = "Theoretical Quantiles",
+       ylab = "Sample Quantiles")
+qqline(starters_23_24$total_points, col = "red", lwd = 2)
+dev.off()
+
+# QQ Plot for 15+ minutes players 22/23
+png(file.path(plot_directory, "QQ Plot of Players 15min+ 22-23 Points.png"), width = 800, height = 600)
+qqnorm(players_15min_22_23$total_points, col = "blue", pch = 20,
+       main = "Q-Q Plot of Players with ≥15 Minutes 22/23 Points",
+       xlab = "Theoretical Quantiles",
+       ylab = "Sample Quantiles")
+qqline(players_15min_22_23$total_points, col = "red", lwd = 2)
+dev.off()
+
+# QQ Plot for 15+ minutes players 23/24
+png(file.path(plot_directory, "QQ Plot of Players 15min+ 23-24 Points.png"), width = 800, height = 600)
+qqnorm(players_15min_23_24$total_points, col = "blue", pch = 20,
+       main = "Q-Q Plot of Players with ≥15 Minutes 23/24 Points",
+       xlab = "Theoretical Quantiles",
+       ylab = "Sample Quantiles")
+qqline(players_15min_23_24$total_points, col = "red", lwd = 2)
+dev.off()
+
+# Additional analysis - Points by position
+# ---------------------------------------
+# Create summary statistics by position for each dataset
+position_stats_starters_22_23 <- starters_22_23 |>
+  group_by(position) |>
+  summarize(
+    Count = n(),
+    Mean = mean(total_points, na.rm = TRUE),
+    Median = median(total_points, na.rm = TRUE),
+    SD = sd(total_points, na.rm = TRUE),
+    Min = min(total_points, na.rm = TRUE),
+    Max = max(total_points, na.rm = TRUE)
+  )
+
+position_stats_starters_23_24 <- starters_23_24 |>
+  group_by(position) |>
+  summarize(
+    Count = n(),
+    Mean = mean(total_points, na.rm = TRUE),
+    Median = median(total_points, na.rm = TRUE),
+    SD = sd(total_points, na.rm = TRUE),
+    Min = min(total_points, na.rm = TRUE),
+    Max = max(total_points, na.rm = TRUE)
+  )
+
+# Print position-based statistics
+cat("Position statistics for starters 22/23:\n")
+print(position_stats_starters_22_23)
+cat("\nPosition statistics for starters 23/24:\n")
+print(position_stats_starters_23_24)
 
 # 1: Goalkeepers (GK)
 
@@ -330,7 +617,7 @@ keras_python <- import("keras")
 keras_python$utils$plot_model(
   model,
   to_file = "keras-model-gk.png",
-  show_shapes = FALSE,  # Set to TRUE to see tensor shapes
+  show_shapes = TRUE,  # Set to TRUE to see tensor shapes
   show_dtype = FALSE,
   show_layer_names = TRUE,
   rankdir = "TB",      # "TB" (top to bottom) or "LR" (left to right)
@@ -382,8 +669,6 @@ scaling_factors$gk <- list(mu = mu,
                            sigma = sigma,
                            numF = numF) # numF here is the one selected by Lasso for GK
 cat("GK scaling factors stored.\n")
-
-
 
 ## MID 1.8: Train Goalkeeper LSTM Model ----
 
@@ -742,6 +1027,12 @@ input_hID_flat <- input_hID %>%
 # Merge categorical branch
 cat_merged <- layer_concatenate(list(embedding_player_id, embedding_tID, embedding_oID, input_hID_flat)) %>%
   layer_dense(units = 16, activation = "relu")
+#### NEW 
+# Add this after your input layers but before LSTM processing
+#input_seq_with_noise <- input_seq %>%
+#  layer_gaussian_noise(stddev = 0.1) %>%  # Adjust stddev as needed
+#  layer_lstm(units = 64, return_sequences = FALSE)
+##### END NEW
 
 # Numerical branch: input for rolling window data
 input_seq <- layer_input(shape = c(ws, length(numF)), name = "input_seq")
