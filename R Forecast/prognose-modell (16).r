@@ -1,30 +1,45 @@
-# Prognoser med LSTM for FPL
-Sys.setenv(WORKON_HOME = "C:/Users/peram/Documents/test/R Forecast/.virtualenvs")
-#install.packages("keras")
-#library(reticulate)
-#virtualenv_create("r-reticulate", python = install_python())
-#library(keras)
-#install_keras(envname = "r-reticulate")
+# Forecasts for FPL Script to Master thesis EBA&PAM
+# To load save weights ----
+# Kaggle Export: The .hdf5 weight files saved in /kaggle/working/ will appear in the "Output" section of your Kaggle notebook session after it completes. You can download them from there.
+# Loading Later: Remember, when you want to use these weights later (in another notebook or locally), you MUST:
+# Rebuild the exact same model architecture using keras_model().
+# Compile the model using the exact same optimizer, loss, and metrics.
+# Load the weights using load_model_weights_hdf5().
+# Load the corresponding scaling factors (mu, sigma, numF) to prepare input data and unscale predictions.
 
 rm(list = ls(all = TRUE))
 
 ## 0: Preamble ----
-library(keras)
-library(tensorflow)
-library(tidyverse)
-library(slider)
-library(glmnet)
-library(httr)
-library(jsonlite)
-library(ggplot2)
+Sys.setenv(WORKON_HOME = "C:/Users/peram/Documents/test/R Forecast/.virtualenvs")
+reticulate::use_virtualenv("C:/Users/peram/Documents/test/R Forecast/.virtualenvs/r-reticulate", required = TRUE)
+# Adjust code to chosen place of
+# 1. Virtual Python Environment
+# 2. Forces R session to use the a specific virtualenv
+# This way the virtual environment does not get installed
+# in your onedrive\documents folder.
 
+
+#install.packages("keras")
+library(reticulate)
+#virtualenv_create("r-reticulate", python = install_python())
+library(keras)
+#install_keras(envname = "r-reticulate")
+
+# Rest of the packages
+if (!require("pacman")) install.packages("pacman")
+pacman::p_load(ggthemes, tidyverse, slider,
+                slider,glmnet,httr,jsonlite,tensorflow,
+                randomForest, Metrics)
+
+# Check if Keras and TF is properly installed
 tf$constant("Hello, TensorFlow!")
 
 # Lists to store models and scaling factors per position
 model_list <- list()
 scaling_factors <- list()
 
-# Treningssplitt: in-sample <= split_gw < out-of-sample
+# Global user inputs ----
+# Trainingsplit : in-sample <= split_gw < out-of-sample
 split_gw <- 38+38
 
 # LSTM
@@ -33,11 +48,11 @@ vindu <- 3
 
 #Metrics for LSTM Models. Alle fungerer ikke fordi noen er for keras 3 eller heter noe annet som jeg ikke finner
 metrics_regression <- c(
-  metric_mean_absolute_error(),
-  metric_mean_squared_error(),
-  metric_root_mean_squared_error(),
-  metric_mean_absolute_percentage_error(),
-  metric_cosine_similarity()
+ # metric_mean_absolute_error(),
+ # metric_mean_squared_error(),
+  metric_root_mean_squared_error()
+ # metric_mean_absolute_percentage_error(),
+ # metric_cosine_similarity()
 )
 
 # Til Prognosering, hvor mange uker frem ønsker du å spå fremover
@@ -47,15 +62,16 @@ antall_uker <- 7
 # Altså hvor mange epoker skal den vente før den slutter å trene modellen og gå tilbake til siste beste
 num_patience <- 5
 
+# Decided embedding dimensions for pos.6 Building the Model
+num_embedding_dimension <- 1
+
+# Fetch data and prelim data manipulation ----
 df <- read_csv("C:/Users/peram/Documents/test/Datasett/Ekstra kolonner, stigende GW, alle tre sesonger(22-24), heltall.csv")
 alternativsammensatt <- df
 
-#----------------------------
-# 0.1: Oppdeling etter posisjon
-#----------------------------
+## Position partitions ----
 gk <- alternativsammensatt |>
   filter(position == "GK")
-
 def <- alternativsammensatt |>
   filter(position == "DEF")
 
@@ -74,9 +90,10 @@ unscaled_def <- def
 unscaled_mid <- mid
 unscaled_fwd <- fwd
 
-#----------------------------
-# Define Features, Target & Scale
-#----------------------------
+# 1: Goalkeepers (GK)
+
+## GK 1.1 Define Features, Target & Scale ----
+
 numF <- c("assists", "creativity", "minutes", "goals_conceded", "saves",
           "bonus", "bps", "expected_assists", "expected_goal_involvements",
           "expected_goals", "ict_index", "own_goals", "red_cards",
@@ -90,7 +107,7 @@ tar <- "total_points"
 cat("Numeriske features:", numF, "\n")
 cat("Kategoriske features:", catF, "\n")
 cat("Target variabel:", tar, "\n")
-cat("Ferdig")
+cat("Ferdig\n")
 
 # Compute and store the mean and standard deviation for the target variable
 
@@ -101,11 +118,10 @@ sigma <- sd(gk[[tar]], na.rm = TRUE)
 gk <- gk %>%
   mutate(across(all_of(numF), ~ (.x - mean(.x, na.rm = TRUE)) / sd(.x, na.rm = TRUE)),
          !!tar := (.data[[tar]] - mu) / sigma)
-cat("Chunk ferdig")
+cat("Chunk done")
 
-#----------------------------
-# 3. Build Rolling Windows
-#----------------------------
+# GK 1.2: Build Rolling Windows ----
+
 # Define window size (number of past gameweeks to use)
 ws <- vindu
 
@@ -146,15 +162,13 @@ catW <- gk %>%
   }) %>%
   ungroup()
 
-cat("Kjørt")
+cat("Chunk done\n")
+
+## GK 1.3: Lasso regression ----
 
 # Check for any NA in the windows before summary
 sumna <- sapply(numW$window, function(flatW) any(is.na(flatW)))
 cat("Windows with NA: ", sum(sumna), "\n")
-
-#----------------------------
-# 4. Lasso regression
-#----------------------------
 
 # numW as data.matrix, tar as response variable
 aggmat <- lapply(numW$window, function(flatW){
@@ -199,9 +213,8 @@ numW <- gk %>%
 numW <- numW %>%
   left_join(gk %>% select(row_id, GW), by = "row_id")
 
-#============================
-# 5. Convert Rolling Windows to Arrays & Extract Targets
-#============================
+## GK 1.4: Convert Rolling Windows ----
+
 # Number of samples is the number of rows in numW
 nSamp <- nrow(numW)
 
@@ -224,11 +237,9 @@ cat_tID <- matrix(as.integer(cat_current[, "tID"]), ncol = 1)
 cat_oID <- matrix(as.integer(cat_current[, "oID"]), ncol = 1)
 cat_hID <- matrix(as.integer(cat_current[, "hID"]), ncol = 1)
 
-cat("Chunk ferdig")
+cat("Chunk done\n")
 
-#============================
-# 6. Split Data into Training and Validation Sets
-#============================
+## GK 1.5: Split Data into Training and Validation Sets ----
 idx <- which(numW$GW <= split_gw)
 
 # Training data
@@ -250,18 +261,16 @@ y_val <- targets[-idx, , drop = FALSE]
 # Also, extract the row IDs for the validation samples (for later joining)
 val_row_ids <- numW$row_id[-idx]
 
-cat("Chunk ferdig")
+cat("Chunk GK 1.4 done")
 
-#============================
-# 7. Build the Model
-#============================
+## GK 1.6: Building the Keras Neural Network Model ----
+
 # Define maximum values for categorical features
 num_players   <- max(gk$player_id)
 num_teams     <- max(gk$tID)
 num_opponents <- max(gk$oID)
-# For hID, assume it???s binary
-
-emb_dim <- 20  # Embedding dimension
+ 
+embedding_dimension <- num_embedding_dimension  # Embedding dimension
 
 # Create input layers for current categorical values
 input_player_id <- layer_input(shape = c(1), dtype = "int32", name = "input_player_id")
@@ -270,13 +279,13 @@ input_oID <- layer_input(shape = c(1), dtype = "int32", name = "input_oID")
 input_hID <- layer_input(shape = c(1), dtype = "int32", name = "input_hID")
 
 embedding_player_id <- input_player_id %>% 
-  layer_embedding(input_dim = num_players + 1, output_dim = emb_dim, mask_zero = TRUE) %>% 
+  layer_embedding(input_dim = num_players + 1, output_dim = embedding_dimension, mask_zero = TRUE) %>% 
   layer_flatten()
 embedding_tID <- input_tID %>% 
-  layer_embedding(input_dim = num_teams + 1, output_dim = emb_dim, mask_zero = TRUE) %>% 
+  layer_embedding(input_dim = num_teams + 1, output_dim = embedding_dimension, mask_zero = TRUE) %>% 
   layer_flatten()
 embedding_oID <- input_oID %>% 
-  layer_embedding(input_dim = num_opponents + 1, output_dim = emb_dim, mask_zero = TRUE) %>% 
+  layer_embedding(input_dim = num_opponents + 1, output_dim = embedding_dimension, mask_zero = TRUE) %>% 
   layer_flatten()
 # For hID, convert to float32 to match types
 input_hID_flat <- input_hID %>% 
@@ -320,7 +329,7 @@ keras_python <- import("keras")
 # Generate the plot with your desired parameters
 keras_python$utils$plot_model(
   model,
-  to_file = "model.png",
+  to_file = "keras-model-gk.png",
   show_shapes = FALSE,  # Set to TRUE to see tensor shapes
   show_dtype = FALSE,
   show_layer_names = TRUE,
@@ -332,8 +341,10 @@ keras_python$utils$plot_model(
 
 # Display the image in R
 library(png) # or library(png) depending on your output format
-img <- readPNG("model.png") # or readJPEG for jpeg format
+img <- readPNG("keras-model-gk.png") # or readJPEG for jpeg format
 grid::grid.raster(img)
+
+## GK 1.7: Callback Functions and Scaling Factors ----
 
 # Filepath for saving the BEST weights (unique for each position)
 weights_filepath_gk <- "R Forecast/best_gk.hdf5"
@@ -372,9 +383,10 @@ scaling_factors$gk <- list(mu = mu,
                            numF = numF) # numF here is the one selected by Lasso for GK
 cat("GK scaling factors stored.\n")
 
-#============================
-# 8. Train the Model
-#============================
+
+
+## MID 1.8: Train Goalkeeper LSTM Model ----
+
 cat("Starting GK model training...\n")
 history <- model %>% fit(
   x = list(
@@ -386,7 +398,7 @@ history <- model %>% fit(
   ),
   y = y_train,
   epochs = epoker,          
-  batch_size = 64,          # Try increasing batch size (e.g., 64 or 128) for speed
+  batch_size = 16,          # Try increasing batch size (e.g., 64 or 128) for speed
   validation_data = list(
     list(
       input_seq = Xnum_val,
@@ -402,9 +414,7 @@ history <- model %>% fit(
 )
 cat("GK model training finished.\n")
 
-#============================
-# 9. Generate Predictions & Invert Scaling on Validation Set
-#============================
+## GK 1.9: Generate Predictions & Invert Scaling on Validation Set ----
 # Use the validation set for predictions
 pred_all <- model %>% predict(
   list(
@@ -434,56 +444,63 @@ preds_gk <- preds_gk %>%
 # View the predictions table
 glimpse(preds_gk)
 
-# Store GK model and scaling factors
+## GK 1.10 Save model and validation set predictions ----
+# Store GK model and scaling factors 
 model_list$gk <- model
-cat("GK model stored in Notebook Memory.\n")
+cat("GK model stored in Notebook Memory/R Session.\n")
+
+# PyCapsule Error makes this unusable l.6-l.8
+# filepath <- "C:/Users/peram/Documents/test/R Forecast/Saved-tf-models"
+# save_model_tf(object = model, filepath = filepath)
 
 # Clean up validation predictions (select essential columns)
 preds_gk_clean <- preds_gk %>%
-  select(row_id, GW, player_id, name, position, team, actual_total_points, predicted_total_points, value)
+  select(row_id, GW, player_id, name, position, team,
+   actual_total_points, predicted_total_points, value)
+cat("Validation Predictions stored in preds_gk_clean.\n")
 
-# Store GK model and scaling factors
-model_list$gk <- model
-cat("GK model stored in Notebook Memory.\n")
+## GK 1.11: Plots for Evaluation ----
 
-# Clean up validation predictions (select essential columns)
-preds_gk_clean <- preds_gk %>%
-  select(row_id, GW, player_id, name, position, team, actual_total_points, predicted_total_points, value)
-
+## GK 1.11 Lagre History til Evaluation ----
 history_gk <- history #class() "keras_training_history"
 history_df_gk <- data.frame(history_gk)
 
-plot(history_gk)
+### GK 1.11.2 Training History Plot ----
+plot_history_gk <- plot(history_gk)
+plot_history_gk
+print(history_df_gk)
 
-### 1.11.2 ----
-ggplot(preds_gk, aes(x = actual_total_points, y = predicted_total_points)) +
+### GK 1.11.3 Actual Y vs Predicted hat Y points ----
+plot_actual_predicted_gk <- ggplot(preds_gk, aes(x = actual_total_points, y = predicted_total_points)) +
   geom_point(alpha = 0.5) + # Use alpha for transparency if many points overlap
   geom_abline(intercept = 0, slope = 1, linetype = "dashed", color = "red") + # y=x line
   labs(title = "Actual vs. Predicted Total Points (Validation Set)",
        x = "Actual Total Points",
        y = "Predicted Total Points") +
   facet_wrap(~ position) + # Optional: Separate plots by position
-  theme_minimal() +
+  theme_grey() +
   coord_cartesian(xlim = range(preds_gk$actual_total_points, na.rm = TRUE), # Adjust limits if needed
                   ylim = range(preds_gk$predicted_total_points, na.rm = TRUE))
+plot_actual_predicted_gk                  
 
-### 1.11.3 Res v. Pred ----
+### GK 1.11.4: Residuals vs Predicted ----
 
-preds_gk_copy <- preds_gk
-preds_gk_copy <- preds_gk_copy %>%
+preds_gk_residuals <- preds_gk # Make copy to add residuals column
+preds_gk_residuals <- preds_gk_residuals %>%
   mutate(residual = actual_total_points - predicted_total_points)
 
-ggplot(preds_gk_copy, aes(x = predicted_total_points, y = residual)) +
+plot_residuals_predicted_gk <- ggplot(preds_gk_residuals, aes(x = predicted_total_points, y = residual)) +
   geom_point(alpha = 0.5) +
   geom_hline(yintercept = 0, linetype = "dashed", color = "red") + # Zero error line
   labs(title = "Residuals vs. Predicted Total Points (Validation Set)",
        x = "Predicted Total Points",
        y = "Residual (Actual - Predicted)") +
   facet_wrap(~ position) + # Optional
-  theme_minimal()
+  theme_grey()  
+plot_residuals_predicted_gk
 
-### 1.11.4 Res dist ----
-ggplot(preds_gk_copy, aes(x = residual)) +
+### GK 1.11.5: Distribution of Residuals ----
+plot_distribution_residuals_gk <- ggplot(preds_gk_residuals, aes(x = residual)) +
   geom_histogram(aes(y = after_stat(density)), bins = 30, fill = "blue", alpha = 0.7) +
   geom_density(color = "red") +
   geom_vline(xintercept = 0, linetype = "dashed", color = "black") +
@@ -491,10 +508,12 @@ ggplot(preds_gk_copy, aes(x = residual)) +
        x = "Residual (Actual - Predicted)",
        y = "Density") +
   facet_wrap(~ position) + # Optional
-  theme_minimal()
+  theme_grey()
+plot_distribution_residuals_gk
 
+### GK 1.11.6 Return list containing loss value and metrics ----
 # After training, evaluate the model on validation data with all metrics
-model_evaluation <- model %>% evaluate(
+model_evaluation <- model %>% keras::evaluate(
   x = list(
     input_seq = Xnum_val,
     input_player_id = cat_player_id_val,
@@ -522,11 +541,10 @@ validation_metrics$gk <- model_list$gk %>% evaluate(
   y = y_val
 )
 
+# 2: Defenders (DEF) ----
 
-# Defenders ========
-#----------------------------
-# Define Features, Target & Scale
-#----------------------------
+## DEF 2.1: Define Features, Target & Scale ----
+
 numF <- c("assists", "creativity", "minutes", "goals_conceded",
           "bonus", "bps", "expected_assists", "expected_goal_involvements",
           "expected_goals", "ict_index", "own_goals", "red_cards",
@@ -541,7 +559,6 @@ cat("Numeriske features:", numF, "\n")
 cat("Kategoriske features:", catF, "\n")
 cat("Target variabel:", tar, "\n")
 cat("Ferdig")
-
 # Compute and store the mean and standard deviation for the target variable
 
 mu <- mean(def[[tar]], na.rm = TRUE)
@@ -554,11 +571,8 @@ def <- def %>%
 
 cat("Kjørt")
 
-### 2.3 DEF Building rolling windows
+## DEF 2.2 Build Rolling Windows ----
 
-#----------------------------
-# 3. Build Rolling Windows
-#----------------------------
 # Define window size (number of past gameweeks to use)
 ws <- vindu
 
@@ -600,13 +614,10 @@ catW <- def %>%
 
 cat("Kjørt")
 
+## DEF 2.3. Lasso regression ----
 # Check for any NA in the windows before summary
 sumna <- sapply(numW$window, function(flatW) any(is.na(flatW)))
 cat("Windows with NA: ", sum(sumna), "\n")
-
-#----------------------------
-# 4. Lasso regression
-#----------------------------
 # numW as data.matrix, tar as response variable
 
 aggmat <- lapply(numW$window, function(flatW){
@@ -652,9 +663,8 @@ numW <- numW %>%
 
 cat("Kjørt")
 
-#============================
-# 5. Convert Rolling Windows to Arrays & Extract Targets
-#============================
+## DEF 2.4 Convert Rolling Windows to Arrays & Extract Targets ----
+
 # Number of samples is the number of rows in numW
 nSamp <- nrow(numW)
 
@@ -677,10 +687,8 @@ cat_tID <- matrix(as.integer(cat_current[, "tID"]), ncol = 1)
 cat_oID <- matrix(as.integer(cat_current[, "oID"]), ncol = 1)
 cat_hID <- matrix(as.integer(cat_current[, "hID"]), ncol = 1)
 
+# DEF 2.5 Split Data into Training and Validation Sets ----
 
-#============================
-# 6. Split Data into Training and Validation Sets
-#============================
 idx <- which(numW$GW <= split_gw)
 
 # Training data
@@ -702,17 +710,14 @@ y_val <- targets[-idx, , drop = FALSE]
 # Also, extract the row IDs for the validation samples (for later joining)
 val_row_ids <- numW$row_id[-idx]
 
+## DEF 2.6 Keras Neural Network Model
 
-#============================
-# 7. Build the Model
-#============================
 # Define maximum values for categorical features
 num_players   <- max(mid$player_id)
 num_teams     <- max(mid$tID)
 num_opponents <- max(mid$oID)
-# For hID, assume it???s binary
 
-emb_dim <- 20  # Embedding dimension
+embedding_dimension <- num_embedding_dimension  # Embedding dimension
 
 # Create input layers for current categorical values
 input_player_id <- layer_input(shape = c(1), dtype = "int32", name = "input_player_id")
@@ -721,13 +726,13 @@ input_oID <- layer_input(shape = c(1), dtype = "int32", name = "input_oID")
 input_hID <- layer_input(shape = c(1), dtype = "int32", name = "input_hID")
 
 embedding_player_id <- input_player_id %>% 
-  layer_embedding(input_dim = num_players + 1, output_dim = emb_dim, mask_zero = TRUE) %>% 
+  layer_embedding(input_dim = num_players + 1, output_dim = embedding_dimension, mask_zero = TRUE) %>% 
   layer_flatten()
 embedding_tID <- input_tID %>% 
-  layer_embedding(input_dim = num_teams + 1, output_dim = emb_dim, mask_zero = TRUE) %>% 
+  layer_embedding(input_dim = num_teams + 1, output_dim = embedding_dimension, mask_zero = TRUE) %>% 
   layer_flatten()
 embedding_oID <- input_oID %>% 
-  layer_embedding(input_dim = num_opponents + 1, output_dim = emb_dim, mask_zero = TRUE) %>% 
+  layer_embedding(input_dim = num_opponents + 1, output_dim = embedding_dimension, mask_zero = TRUE) %>% 
   layer_flatten()
 # For hID, convert to float32 to match types
 input_hID_flat <- input_hID %>% 
@@ -761,8 +766,32 @@ model %>% compile(
   metrics = metrics_regression,
   run_eagerly = TRUE
 )
-summary(model)
 
+summary(model)
+plot(model)
+
+# Access the Python keras module directly
+keras_python <- import("keras")
+
+# Generate the plot with your desired parameters
+keras_python$utils$plot_model(
+  model,
+  to_file = "keras-model-def.png",
+  show_shapes = FALSE,  # Set to TRUE to see tensor shapes
+  show_dtype = FALSE,
+  show_layer_names = TRUE,
+  rankdir = "TB",      # "TB" (top to bottom) or "LR" (left to right)
+  expand_nested = FALSE,
+  dpi = 200,
+  show_layer_activations = FALSE
+)
+
+# Display the image in R
+library(png) # or library(png) depending on your output format
+img <- readPNG("keras-model-def.png") # or readJPEG for jpeg format
+grid::grid.raster(img)
+
+## DEF 2.7: Callback Functions and Scaling Factors ----
 # Filepath for saving the BEST weights (unique for each position)
 weights_filepath_def <- "R Forecast/best_def.hdf5"
 cat("Will save best DEF weights to:", weights_filepath_def, "\n")
@@ -802,9 +831,7 @@ scaling_factors$def <- list(
 )
 cat("DEF scaling factors stored.\n")
 
-#============================
-# 8. Train the Model
-#============================
+## DEF 2.8: Train Defender LSTM Model  ----
 cat("Starting DEF model training...\n")
 history <- model %>% fit(
   x = list(
@@ -832,10 +859,8 @@ history <- model %>% fit(
 )
 cat("DEF model training finished.\n")
 
+## DEF 2.9: Generate Predictions & Invert Scaling on Validation Set ----
 
-#============================
-# 9. Generate Predictions & Invert Scaling on Validation Set
-#============================
 # Use the validation set for predictions
 pred_all <- model %>% predict(
   list(
@@ -864,24 +889,68 @@ preds_def <- preds_def %>%
 # View the predictions table
 glimpse(preds_def)
 
-plot(history)
-
-history_df_def <- as.data.frame(history)
-
-glimpse(history_df_def)
-
-
+## DEF 2.10 Save model and validation set predictions ----
 # Store DEF model and scaling factors
 model_list$def <- model
 cat("DEF model and scaling factors stored.\n")
 
 # Clean up validation predictions (select essential columns)
-# Note: The join in cell d3115b67 uses 'def' (scaled) then 'unscaled_def'.
-# We need identifiers from unscaled_def.
 preds_def_clean <- preds_def %>%
   select(row_id, GW, player_id, name, position, team, # Identifiers from unscaled_def join
          actual_total_points, predicted_total_points, value)
+cat("Validation Predictions stored in preds_def_clean.\n")
 
+### DEF 2.11.1 Save training and fit history ----
+history_def <- history #class() "keras_training_history"
+history_df_def <- data.frame(history_def)
+
+### DEF 2.11.2 Training History Plot ----
+plot_history_def <- plot(history_def)
+plot_history_def
+print(history_df_def)
+
+### DEF 2.11.3 Actual Y vs Predicted hat Y points ----
+plot_actual_predicted_def <- ggplot(preds_def, aes(x = actual_total_points, y = predicted_total_points)) +
+  geom_point(alpha = 0.5) + # Use alpha for transparency if many points overlap
+  geom_abline(intercept = 0, slope = 1, linetype = "dashed", color = "red") + # y=x line
+  labs(title = "Actual vs. Predicted Total Points (Validation Set)",
+       x = "Actual Total Points",
+       y = "Predicted Total Points") +
+  facet_wrap(~ position) + # Optional: Separate plots by position
+  theme_grey() +
+  coord_cartesian(xlim = range(preds_def$actual_total_points, na.rm = TRUE), # Adjust limits if needed
+                  ylim = range(preds_def$predicted_total_points, na.rm = TRUE))
+plot_actual_predicted_def
+
+### DEF 2.11.4: Residuals vs Predicted ----
+
+preds_def_residuals <- preds_def # Make copy to add residuals column
+preds_def_residuals <- preds_def_residuals %>%
+  mutate(residual = actual_total_points - predicted_total_points)
+
+plot_residuals_predicted_def <- ggplot(preds_def_residuals, aes(x = predicted_total_points, y = residual)) +
+  geom_point(alpha = 0.5) +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "red") + # Zero error line
+  labs(title = "Residuals vs. Predicted Total Points (Validation Set)",
+       x = "Predicted Total Points",
+       y = "Residual (Actual - Predicted)") +
+  facet_wrap(~ position) + # Optional
+  theme_grey()
+plot_residuals_predicted_def
+
+### DEF 2.11.5: Distribution of Residuals ----
+plot_distribution_residuals_def <- ggplot(preds_def_residuals, aes(x = residual)) +
+  geom_histogram(aes(y = after_stat(density)), bins = 30, fill = "blue", alpha = 0.7) +
+  geom_density(color = "red") +
+  geom_vline(xintercept = 0, linetype = "dashed", color = "black") +
+  labs(title = "Distribution of Residuals (Validation Set)",
+       x = "Residual (Actual - Predicted)",
+       y = "Density") +
+  facet_wrap(~ position) + # Optional
+  theme_grey()
+plot_distribution_residuals_def
+
+### DEF 2.11.6 Return list containing loss value and metrics
 # After training, evaluate the model on validation data with all metrics
 model_evaluation <- model %>% evaluate(
   x = list(
@@ -910,9 +979,10 @@ validation_metrics$def <- model_list$def %>% evaluate(
   y = y_val
 )
 
-#----------------------------
-# Define Features, Target & Scale
-#----------------------------
+# 3: Midfielders (MID) ----
+
+## MID 3.1: Define Features, Target & Scale ----
+
 numF <- c("assists", "creativity", "minutes", "goals_conceded",
           "bonus", "bps", "expected_assists", "expected_goal_involvements",
           "expected_goals", "ict_index", "own_goals", "red_cards",
@@ -939,9 +1009,7 @@ mid <- mid %>%
          !!tar := (.data[[tar]] - mu) / sigma)
 cat("Kjørt")
 
-#----------------------------
-# 3. Build Rolling Windows
-#----------------------------
+## MID 3.2: Build Rolling Windows ----
 # Define window size (number of past gameweeks to use)
 ws <- vindu
 
@@ -983,15 +1051,13 @@ catW <- mid %>%
 
 cat("Kjørt")
 
+## MID 3.3: Lasso regression ----
+
 # Check for any NA in the windows before summary
 sumna <- sapply(numW$window, function(flatW) any(is.na(flatW)))
 cat("Windows with NA: ", sum(sumna), "\n")
 
-#----------------------------
-# 4. Lasso regression
-#----------------------------
 # numW as data.matrix, tar as response variable
-
 aggmat <- lapply(numW$window, function(flatW){
   colMeans(flatW, na.rm = TRUE)
 })
@@ -1033,9 +1099,8 @@ numW <- mid %>%
 numW <- numW %>%
   left_join(mid %>% select(row_id, GW), by = "row_id")
 
-#============================
-# 5. Convert Rolling Windows to Arrays & Extract Targets
-#============================
+## MID 3.4: Convert Rolling Windows to Arrays & Extract Targets ----
+
 # Number of samples is the number of rows in numW
 nSamp <- nrow(numW)
 
@@ -1058,9 +1123,8 @@ cat_tID <- matrix(as.integer(cat_current[, "tID"]), ncol = 1)
 cat_oID <- matrix(as.integer(cat_current[, "oID"]), ncol = 1)
 cat_hID <- matrix(as.integer(cat_current[, "hID"]), ncol = 1)
 
-#============================
-# 6. Split Data into Training and Validation Sets
-#============================
+## MID 3.5: Split Data into Training and Validation Sets ----
+
 idx <- which(numW$GW <= split_gw)
 
 # Training data
@@ -1082,16 +1146,17 @@ y_val <- targets[-idx, , drop = FALSE]
 # Also, extract the row IDs for the validation samples (for later joining)
 val_row_ids <- numW$row_id[-idx]
 
-#============================
-# 7. Build the Model
-#============================
+cat("Cell loaded\n")
+
+## MID 3.6: Building the Keras Neural Network Model ----
+
+cat("Building the Model\n")
 # Define maximum values for categorical features
 num_players   <- max(mid$player_id)
 num_teams     <- max(mid$tID)
 num_opponents <- max(mid$oID)
-# For hID, assume it???s binary
 
-emb_dim <- 20  # Embedding dimension
+embedding_dimension <- num_embedding_dimension  # Embedding dimension
 
 # Create input layers for current categorical values
 input_player_id <- layer_input(shape = c(1), dtype = "int32", name = "input_player_id")
@@ -1100,13 +1165,13 @@ input_oID <- layer_input(shape = c(1), dtype = "int32", name = "input_oID")
 input_hID <- layer_input(shape = c(1), dtype = "int32", name = "input_hID")
 
 embedding_player_id <- input_player_id %>% 
-  layer_embedding(input_dim = num_players + 1, output_dim = emb_dim, mask_zero = TRUE) %>% 
+  layer_embedding(input_dim = num_players + 1, output_dim = embedding_dimension, mask_zero = TRUE) %>% 
   layer_flatten()
 embedding_tID <- input_tID %>% 
-  layer_embedding(input_dim = num_teams + 1, output_dim = emb_dim, mask_zero = TRUE) %>% 
+  layer_embedding(input_dim = num_teams + 1, output_dim = embedding_dimension, mask_zero = TRUE) %>% 
   layer_flatten()
 embedding_oID <- input_oID %>% 
-  layer_embedding(input_dim = num_opponents + 1, output_dim = emb_dim, mask_zero = TRUE) %>% 
+  layer_embedding(input_dim = num_opponents + 1, output_dim = embedding_dimension, mask_zero = TRUE) %>% 
   layer_flatten()
 # For hID, convert to float32 to match types
 input_hID_flat <- input_hID %>% 
@@ -1140,7 +1205,30 @@ model %>% compile(
   metrics = metrics_regression,
   run_eagerly = TRUE
 )
+
 summary(model)
+plot(model)
+
+# Access the Python keras module directly
+keras_python <- import("keras")
+
+# Generate the plot with your desired parameters
+keras_python$utils$plot_model(
+  model,
+  to_file = "keras-model-mid.png",
+  show_shapes = FALSE,  # Set to TRUE to see tensor shapes
+  show_dtype = FALSE,
+  show_layer_names = TRUE,
+  rankdir = "TB",      # "TB" (top to bottom) or "LR" (left to right)
+  expand_nested = FALSE,
+  dpi = 200,
+  show_layer_activations = FALSE
+)
+
+# Display the image in R
+library(png) # or library(png) depending on your output format
+img <- readPNG("keras-model-mid.png") # or readJPEG for jpeg format
+grid::grid.raster(img)
 
 # Filepath for saving the BEST weights (unique for each position)
 weights_filepath_mid <- "R Forecast/best_mid.hdf5"
@@ -1181,9 +1269,8 @@ scaling_factors$mid <- list(
 )
 cat("MID scaling factors stored.\n")
 
-#============================
-# 8. Train the Model
-#============================
+## MID 3.8: Train Midfield LSTM Model ----
+
 cat("Starting MID model training...\n")
 history <- model %>% fit(
   x = list(
@@ -1211,10 +1298,8 @@ history <- model %>% fit(
 )
 cat("MID model training finished.\n")
 
+## MID 3.9: Generate Predictions & Invert Scaling on Validation Set ----
 
-#============================
-# 9. Generate Predictions & Invert Scaling on Validation Set
-#============================
 # Use the validation set for predictions
 pred_all <- model %>% predict(
   list(
@@ -1243,12 +1328,7 @@ preds_mid <- preds_mid %>%
 # View the predictions table
 glimpse(preds_mid)
 
-plot(history)
-
-history_df_mid <- as.data.frame(history)
-
-glimpse(history_df_mid)
-
+## MID 3.10: Save model and validation set predictions ----
 # Store MID model and scaling factors
 model_list$mid <- model
 scaling_factors$mid <- list(mu = mu, sigma = sigma, numF = numF) # numF here is the one selected by Lasso for MID
@@ -1260,7 +1340,45 @@ preds_mid_clean <- preds_mid %>%
    select(row_id, GW, player_id, name, position, team, # Identifiers from unscaled_mid join
          actual_total_points, predicted_total_points, value)
 
-#save_model_tf(model, filepath = "/kaggle/working/midmodel_tf")
+## MID 3.11: Plots for Evaluation ----
+
+### MID 3.11.1 Save training and fit history ----
+history_mid <- history #class() "keras_training_history"
+history_df_mid <- data.frame(history_mid)
+
+### MID 3.11.2 Training History Plot
+plot_history_mid<- plot(history_mid)
+plot_history_mid
+print(history_df_mid)
+
+### MID 3.11.4: Residuals vs Predicted ----
+preds_mid_residuals <- preds_mid # Make copy to add residuals column
+preds_mid_residuals <- preds_mid_residuals %>%
+  mutate(residual = actual_total_points - predicted_total_points)
+
+plot_residuals_predicted_mid <- ggplot(preds_mid_residuals, aes(x = predicted_total_points, y = residual)) +
+  geom_point(alpha = 0.5) +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "red") + # Zero error line
+  labs(title = "Residuals vs. Predicted Total Points (Validation Set)",
+       x = "Predicted Total Points",
+       y = "Residual (Actual - Predicted)") +
+  facet_wrap(~ position) + # Optional
+  theme_grey()
+plot_residuals_predicted_mid
+
+### MID 3.11.5: Distribution of Residuals ----
+plot_distribution_residuals_mid <- ggplot(preds_mid_residuals, aes(x = residual)) +
+  geom_histogram(aes(y = after_stat(density)), bins = 30, fill = "blue", alpha = 0.7) +
+  geom_density(color = "red") +
+  geom_vline(xintercept = 0, linetype = "dashed", color = "black") +
+  labs(title = "Distribution of Residuals (Validation Set)",
+       x = "Residual (Actual - Predicted)",
+       y = "Density") +
+  facet_wrap(~ position) + # Optional
+  theme_grey()
+plot_distribution_residuals_mid 
+
+### MID 3.11.6 Return list containing loss value and metrics ----
 
 # After training, evaluate the model on validation data with all metrics
 model_evaluation <- model %>% evaluate(
@@ -1290,9 +1408,10 @@ validation_metrics$mid <- model_list$mid %>% evaluate(
   y = y_val
 )
 
-#----------------------------
-# Define Features, Target & Scale
-#----------------------------
+# 4: Forwards ----
+
+## FWD 4.1 Define Features, Target & Scale ----
+
 numF <- c("assists", "creativity", "minutes", "goals_conceded",
           "bonus", "bps", "expected_assists", "expected_goal_involvements",
           "expected_goals", "ict_index", "own_goals", "red_cards",
@@ -1307,7 +1426,6 @@ cat("Numeriske features:", numF, "\n")
 cat("Kategoriske features:", catF, "\n")
 cat("Target variabel:", tar, "\n")
 cat("Ferdig")
-
 # numF, catF og tar variablene brukes på nytt
 # Compute and store the mean and standard deviation for the target variable
 mu <- mean(fwd[[tar]], na.rm = TRUE)
@@ -1317,11 +1435,11 @@ sigma <- sd(fwd[[tar]], na.rm = TRUE)
 fwd <- fwd %>%
   mutate(across(all_of(numF), ~ (.x - mean(.x, na.rm = TRUE)) / sd(.x, na.rm = TRUE)),
          !!tar := (.data[[tar]] - mu) / sigma)
-cat("Kjørt")
 
-#----------------------------
-# 3. Build Rolling Windows
-#----------------------------
+cat("Chunk Done\n")
+
+## FWD 4.2 Building rolling windows ----
+
 # Define window size (number of past gameweeks to use)
 ws <- vindu
 
@@ -1361,15 +1479,14 @@ catW <- fwd %>%
   }) %>%
   ungroup()
 
-cat("Kjørt")
+cat("Chunk done\n")
+
+## FWD 4.3: Lasso regression ----
 
 # Check for any NA in the windows before summary
 sumna <- sapply(numW$window, function(flatW) any(is.na(flatW)))
 cat("Windows with NA: ", sum(sumna), "\n")
 
-#----------------------------
-# 4. Lasso regression
-#----------------------------
 # numW as data.matrix, tar as response variable
 
 aggmat <- lapply(numW$window, function(flatW){
@@ -1414,9 +1531,8 @@ numW <- fwd %>%
 numW <- numW %>%
   left_join(fwd %>% select(row_id, GW), by = "row_id")
 
-#============================
-# 5. Convert Rolling Windows to Arrays & Extract Targets
-#============================
+## FWD 4.4: Convert Rolling Windows ----
+
 # Number of samples is the number of rows in numW
 nSamp <- nrow(numW)
 
@@ -1439,9 +1555,10 @@ cat_tID <- matrix(as.integer(cat_current[, "tID"]), ncol = 1)
 cat_oID <- matrix(as.integer(cat_current[, "oID"]), ncol = 1)
 cat_hID <- matrix(as.integer(cat_current[, "hID"]), ncol = 1)
 
-#============================
-# 6. Split Data into Training and Validation Sets
-#============================
+cat("Chunk done\n")
+
+## FWD 4.5: Split Data into Training and Validation Sets ----
+
 idx <- which(numW$GW <= split_gw)
 
 # Training data
@@ -1462,17 +1579,16 @@ y_val <- targets[-idx, , drop = FALSE]
 
 # Also, extract the row IDs for the validation samples (for later joining)
 val_row_ids <- numW$row_id[-idx]
+cat("Chunk FWD 4.4 done")
 
-#============================
-# 7. Build the Model
-#============================
+## FWD 4.6: Building the Keras Neural Network Model ----
+
 # Define maximum values for categorical features
 num_players   <- max(fwd$player_id)
 num_teams     <- max(fwd$tID)
 num_opponents <- max(fwd$oID)
-# For hID, assume it???s binary
 
-emb_dim <- 20  # Embedding dimension
+embedding_dimension <- num_embedding_dimension  # Embedding dimension
 
 # Create input layers for current categorical values
 input_player_id <- layer_input(shape = c(1), dtype = "int32", name = "input_player_id")
@@ -1481,13 +1597,13 @@ input_oID <- layer_input(shape = c(1), dtype = "int32", name = "input_oID")
 input_hID <- layer_input(shape = c(1), dtype = "int32", name = "input_hID")
 
 embedding_player_id <- input_player_id %>% 
-  layer_embedding(input_dim = num_players + 1, output_dim = emb_dim, mask_zero = TRUE) %>% 
+  layer_embedding(input_dim = num_players + 1, output_dim = embedding_dimension, mask_zero = TRUE) %>% 
   layer_flatten()
 embedding_tID <- input_tID %>% 
-  layer_embedding(input_dim = num_teams + 1, output_dim = emb_dim, mask_zero = TRUE) %>% 
+  layer_embedding(input_dim = num_teams + 1, output_dim = embedding_dimension, mask_zero = TRUE) %>% 
   layer_flatten()
 embedding_oID <- input_oID %>% 
-  layer_embedding(input_dim = num_opponents + 1, output_dim = emb_dim, mask_zero = TRUE) %>% 
+  layer_embedding(input_dim = num_opponents + 1, output_dim = embedding_dimension, mask_zero = TRUE) %>% 
   layer_flatten()
 # For hID, convert to float32 to match types
 input_hID_flat <- input_hID %>% 
@@ -1521,7 +1637,32 @@ model %>% compile(
   metrics = metrics_regression,
   run_eagerly = TRUE
 )
+
 summary(model)
+plot(model)
+
+# Access the Python keras module directly
+keras_python <- import("keras")
+
+# Generate the plot with your desired parameters
+keras_python$utils$plot_model(
+  model,
+  to_file = "keras-model-fwd.png",
+  show_shapes = FALSE,  # Set to TRUE to see tensor shapes
+  show_dtype = FALSE,
+  show_layer_names = TRUE,
+  rankdir = "TB",      # "TB" (top to bottom) or "LR" (left to right)
+  expand_nested = FALSE,
+  dpi = 200,
+  show_layer_activations = FALSE
+)
+
+# Display the image in R
+library(png) # or library(png) depending on your output format
+img <- readPNG("keras-model-fwd.png") # or readJPEG for jpeg format
+grid::grid.raster(img)
+
+## FWD 4.7: Callback Functions and Scaling Factors ----
 
 # Filepath for saving the BEST weights (unique for each position)
 weights_filepath_fwd <- "R Forecast/best_fwd_weights.hdf5"
@@ -1562,9 +1703,8 @@ scaling_factors$fwd <- list(
 )
 cat("FWD scaling factors stored.\n")
 
-#============================
-# 8. Train the Model
-#============================
+## FWD 4.8: Train Forwards LSTM Model ----
+
 cat("Starting FWD model training...\n")
 history <- model %>% fit(
   x = list(
@@ -1592,9 +1732,8 @@ history <- model %>% fit(
 )
 cat("FWD model training finished.\n")
 
-#============================
-# 9. Generate Predictions & Invert Scaling on Validation Set
-#============================
+## FDW 4.9: Generate Predictions & Invert Scaling on Validation Set ----
+
 # Use the validation set for predictions
 pred_all <- model %>% predict(
   list(
@@ -1622,22 +1761,70 @@ preds_fwd <- preds_fwd %>%
 
 glimpse(preds_fwd)
 
-plot(history)
-
-history_df_fwd <- data.frame(history)
-
-glimpse(history_df_fwd)
-
+## FWD 4.10: Save model and validation set predictions ----
 # Store FWD model and scaling factors
 model_list$fwd <- model
 cat("FWD model and scaling factors stored.\n")
 
 # Clean up validation predictions (select essential columns)
-# Note: The join in cell f2292df7 uses 'fwd' (scaled) then 'unscaled_fwd'.
 preds_fwd_clean <- preds_fwd %>%
    select(row_id, GW , player_id , name, position, team, # Identifiers from unscaled_fwd join
          actual_total_points, predicted_total_points, value)
+cat("Validation Predictions stored in preds_fwd_clean.\n")
 
+## FWD 4.11: Plots for Evaluation ----
+
+### FWD 4.11.1 Save training and fit history ----
+history_fwd <- history #class() "keras_training_history"
+history_df_fwd <- data.frame(history_fwd)
+
+### FWD 4.11.2 Training History Plot ----
+plot_history_fwd <- plot(history_fwd)
+plot_history_fwd
+print(history_df_fwd)
+
+### FWD 4.11.3 Actual Y vs Predicted hat Y points ----
+plot_actual_predicted_fwd <- ggplot(preds_fwd, aes(x = actual_total_points, y = predicted_total_points)) +
+  geom_point(alpha = 0.5) + # Use alpha for transparency if many points overlap
+  geom_abline(intercept = 0, slope = 1, linetype = "dashed", color = "red") + # y=x line
+  labs(title = "Actual vs. Predicted Total Points (Validation Set)",
+       x = "Actual Total Points",
+       y = "Predicted Total Points") +
+  facet_wrap(~ position) + # Optional: Separate plots by position
+  theme_grey() +
+  coord_cartesian(xlim = range(preds_fwd$actual_total_points, na.rm = TRUE), # Adjust limits if needed
+                  ylim = range(preds_fwd$predicted_total_points, na.rm = TRUE))
+plot_actual_predicted_fwd    
+
+### FWD 4.11.4: Residuals vs Predicted ----
+
+preds_fwd_residuals <- preds_fwd # Make copy to add residuals column
+preds_fwd_residuals <- preds_fwd_residuals %>%
+  mutate(residual = actual_total_points - predicted_total_points)
+
+plot_residuals_predicted_fwd <- ggplot(preds_fwd_residuals, aes(x = predicted_total_points, y = residual)) +
+  geom_point(alpha = 0.5) +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "red") + # Zero error line
+  labs(title = "Residuals vs. Predicted Total Points (Validation Set)",
+       x = "Predicted Total Points",
+       y = "Residual (Actual - Predicted)") +
+  facet_wrap(~ position) + # Optional
+  theme_grey()  
+plot_residuals_predicted_fwd
+
+### FWD 4.11.5: Distribution of Residuals ----
+plot_distribution_residuals_fwd <- ggplot(preds_fwd_residuals, aes(x = residual)) +
+  geom_histogram(aes(y = after_stat(density)), bins = 30, fill = "blue", alpha = 0.7) +
+  geom_density(color = "red") +
+  geom_vline(xintercept = 0, linetype = "dashed", color = "black") +
+  labs(title = "Distribution of Residuals (Validation Set)",
+       x = "Residual (Actual - Predicted)",
+       y = "Density") +
+  facet_wrap(~ position) + # Optional
+  theme_grey()
+plot_distribution_residuals_fwd
+
+### FWD 4.11.6 Return list containing loss value and metrics ----
 # After training, evaluate the model on validation data with all metrics
 model_evaluation <- model %>% evaluate(
   x = list(
@@ -1666,6 +1853,7 @@ validation_metrics$fwd <- model_list$fwd %>% evaluate(
   y = y_val
 )
 
+# Merging Datasets ----
 glimpse(preds_gk)
 glimpse(preds_def)
 glimpse(preds_mid)
@@ -1687,6 +1875,7 @@ glimpse(validation_results_df)
 forecastdf_detailed <- bind_rows(preds_gk, preds_def, preds_mid, preds_fwd)
 cat("Clean and detailed validation results combined.\n")
 
+## Evaluation Metrics Dataframe ----
 # Create metrics comparison dataframe
 metrics_df <- data.frame(
   metric = names(validation_metrics$gk),
@@ -1698,6 +1887,10 @@ metrics_df <- data.frame(
 
 metrics_df
 
+# Plots
+
+
+## Export Predicted Validation Set as .CSV ----
 # Export CLEAN validation results
 write_csv(validation_results_df, "Validation_Predictions_Clean.csv")
 cat("Clean validation predictions saved to Validation_Predictions_Clean.csv\n")
@@ -1705,6 +1898,17 @@ cat("Clean validation predictions saved to Validation_Predictions_Clean.csv\n")
 # Export DETAILED validation results (original behavior, renamed file)
 write_csv(forecastdf_detailed, "Validation_Predictions_Detailed.csv")
 cat("Detailed validation predictions saved to Validation_Predictions_Detailed.csv\n")
+
+# Make further predictions ----
+# To do this we need future fixtures including:
+# - GW (gameweek number)
+# - team_id (team identifier matching your tID)
+# - opponent_id (opponent identifier matching your oID)
+# - is_home (1 for home, 0 for away)
+
+## Helper functions: ----
+
+### Get FPL fixtures ----
 
 # Funksjon som henter fra api
 # Function to get fixtures from FPL API
