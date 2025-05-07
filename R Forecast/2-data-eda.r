@@ -466,7 +466,7 @@ qqnorm(all_players_22_23$total_points, col = "blue", pch = 20,
 qqline(all_players_22_23$total_points, col = "red", lwd = 2)
 dev.off()
 
-# QQ Plot for all players 23/24
+# QQ Plot for all players 23/24 
 png(file.path(plot_directory, "QQ Plot of All Players 23-24 Points.png"), width = 800, height = 600)
 qqnorm(all_players_23_24$total_points, col = "blue", pch = 20,
        main = "Q-Q Plot of All Players 23/24 Points",
