@@ -15,8 +15,7 @@ parser.add_argument('--max_gw', type=int, default=78+29, help='Maximum gameweek'
 args = parser.parse_args()
 
 # --- Input Parameters ---
-CSV_FILE_PATH = "C:/Users/peram/Documents/test/Datasett/Validation_Predictions_Clean (2).csv" 
-
+CSV_FILE_PATH = "C:/Users/peram/Documents/test/R Forecast/Validation_Predictions_Clean.csv" 
 START_GAMEWEEK = args.start_gw # Now uses command line argument
 MAX_GAMEWEEK = args.max_gw # Now uses command line argument
 SUB_HORIZON_LENGTH = args.horizon # Now uses command line argument
@@ -26,11 +25,11 @@ SOLVER_TIME_LIMIT = None  # Seconds (e.g., 600 for 10 mins) or None for no limit
 
 # ---  Gamechip manual usage or None ---- 
 SEASON_START_GW = START_GAMEWEEK
-TARGET_GW_WC1_OPPORTUNITY = None#SEASON_START_GW + 1
-TARGET_GW_TC = None#SEASON_START_GW + 2 
-TARGET_GW_FH = None#SEASON_START_GW + 3 
-TARGET_GW_WC2_OPPORTUNITY = None#SEASON_START_GW + 4 
-TARGET_GW_BB = None#SEASON_START_GW + 5 
+TARGET_GW_WC1_OPPORTUNITY = 0 #SEASON_START_GW + 1
+TARGET_GW_TC = 0 #SEASON_START_GW + 2 
+TARGET_GW_FH = 0 #SEASON_START_GW + 3 
+TARGET_GW_WC2_OPPORTUNITY = 0 #SEASON_START_GW + 4 
+TARGET_GW_BB = 0 #SEASON_START_GW + 5 
 print(f"Chip Opportunity GWs (Absolute): WC1={TARGET_GW_WC1_OPPORTUNITY}, TC={TARGET_GW_TC}, FH={TARGET_GW_FH}, WC2={TARGET_GW_WC2_OPPORTUNITY}, BB={TARGET_GW_BB}")
 
 
