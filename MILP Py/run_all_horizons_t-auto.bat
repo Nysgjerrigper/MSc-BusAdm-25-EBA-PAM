@@ -5,7 +5,7 @@ echo Starting FPL Optimization with Multiple Horizon Lengths
 echo =======================================================
 
 REM Define the horizon values to test (from highest to lowest)
-set horizons= 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 
+set horizons= 1 2 3 4 5 6 7 8 9 10
 
 REM Define gameweek range - ADDED THESE TWO LINES
 set start_gw= 77

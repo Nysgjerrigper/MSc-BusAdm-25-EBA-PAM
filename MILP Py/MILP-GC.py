@@ -8,11 +8,11 @@ import math # Used for rounding FT
 # Removed threading import
 
 # --- Input Parameters ---
-CSV_FILE_PATH = "C:/Users/peram/Documents/test/Datasett/Validation_Predictions_Clean (2).csv" # <<< POINT TO RAW, NON-AGGREGATED FILE
+CSV_FILE_PATH = "C:/Users/peram/Documents/test/Validation_Predictions_Clean_v2.csv" # <<< POINT TO RAW, NON-AGGREGATED FILE
 
-START_GAMEWEEK = 80 # Example: Start of the 3rd season (1+38+38)
-MAX_GAMEWEEK = 85 # Example: Run for a few GWs for testing
-SUB_HORIZON_LENGTH = 5 # Look ahead N weeks
+START_GAMEWEEK = 77 # Example: Start of the 3rd season (1+38+38)
+MAX_GAMEWEEK = 107 # Example: Run for a few GWs for testing
+SUB_HORIZON_LENGTH = 10 # Look ahead N weeks
 # --- SET TIMELIMIT HERE ---
 SOLVER_TIME_LIMIT = None  # Seconds (e.g., 600 for 10 mins) or None for no limit
 # PROGRESS_UPDATE_INTERVAL = 60 # Removed

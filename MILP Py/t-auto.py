@@ -21,7 +21,7 @@ parser.add_argument('--max_gw', type=int, default=78+29, help='Maximum gameweek'
 args = parser.parse_args()
 
 # --- Input Parameters ---
-CSV_FILE_PATH = "C:/Users/peram/Documents/test/R Forecast/Validation_Predictions_Clean.csv"
+CSV_FILE_PATH = "C:/Users/peram/Documents/test/Validation_Predictions_Clean_v2.csv"
 
 START_GAMEWEEK = args.start_gw # Now uses command line argument
 MAX_GAMEWEEK = args.max_gw # Now uses command line argument

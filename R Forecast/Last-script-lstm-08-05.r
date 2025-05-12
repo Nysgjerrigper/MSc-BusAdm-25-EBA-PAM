@@ -31,7 +31,7 @@ validation_metrics <- list() # For storing evaluation results
 # Global user inputs ----
 split_gw <- 38+38
 epoker <- 15
-vindu <- 4
+vindu <- 3
 emb_dim <- 16
 num_patience <- round(epoker*0.5)
 
@@ -982,7 +982,7 @@ validation_metrics
 print(metrics_df)
 
 # Save plots
-plot_dir <- "C:/Users/peram/Documents/test/R Forecast/Plots from LSTM Forecast notebook"
+plot_dir <- "C:/Users/peram/Documents/test/R Forecast/Plots from LSTM Forecast script"
 if (!dir.exists(plot_dir)) dir.create(plot_dir, recursive = TRUE)
 
 # GK plots
@@ -1014,8 +1014,11 @@ write_csv(validation_results_df, "Validation_Predictions_Clean_v2.csv")
 write_csv(forecastdf_detailed, "Validation_Predictions_Detailed_v2.csv")
 
 ### Lasso selected features ----
-cat("GK Lasso Features:\n"); print(numF_gk)
-cat("DEF Lasso Features:\n"); print(numF_def)
-cat("MID Lasso Features:\n"); print(numF_mid)
-cat("FWD Lasso Features:\n"); print(numF_fwd)
-
+cat("GK Lasso Features:\n"); print(numF_gk) ; length(numF_gk)
+cat("DEF Lasso Features:\n"); print(numF_def) ; length(numF_def)
+cat("MID Lasso Features:\n"); print(numF_mid) ; length(numF_mid) 
+cat("FWD Lasso Features:\n"); print(numF_fwd) ; length(numF_fwd)
+initial_numF_gk
+initial_numF_def
+initial_numF_mid
+initial_numF_fwd
