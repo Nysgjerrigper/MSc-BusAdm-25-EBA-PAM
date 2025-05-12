@@ -5,7 +5,7 @@ library(tidyr)
 library(stringr) # For str_extract and str_pad
 
 # Set working directory (adjust path as needed)
-setwd("C:/Users/peram/OneDrive/Skrivebord/Squad Opt Predicted Poeng")
+setwd("C:/Users/peram/Documents/test/MILP Py")
 
 # Initialize an empty data frame to store combined data
 combined_data_lstm <- data.frame()
@@ -75,16 +75,16 @@ end_values_lstm <- cumulative_plot_data_lstm %>%
   ungroup()
 cat("\n--- End Cumulative Values for LSTM Data ---\n")
 
-print(xtable::xtable(end_values_lstm))
+end_values_lstm_x <- print(xtable::xtable(end_values_lstm))
 
 
 # Actual ----
-setwd("C:/Users/peram/OneDrive/Skrivebord/Squad Opt Faktisk Poeng")
+#setwd("C:/Users/peram/Documents/test/MILP Py")
 combined_data_actual <- data.frame()
 
 # Loop through the n files
-for (i in 1:11) {
-  file_name <- paste0("Squad Selection AUTO-MILP-GC-TOTAL_POINTS, GW77-108,SHL", i, ".csv")
+for (i in 1:10) {
+  file_name <- paste0("Squad Selection t-auto-actual, W77-108,SHL", i, ".csv")
   temp_data <- read.csv(file_name)
   temp_data <- temp_data %>%
     select(gameweek, objective_gw) %>%
@@ -145,4 +145,9 @@ end_values_actual <- cumulative_plot_data_actual %>%
   select(sub_horizon, end_gameweek = gameweek, final_cumulative_points = cumulative_objective_points) %>%
   ungroup()
 cat("\n--- End Cumulative Values for Actual Data ---\n")
-print(xtable::xtable(end_values_actual))
+
+end_values_actual_x <- print(xtable::xtable(end_values_actual))
+
+#Exp tables to txt
+write.table(end_values_lstm, file = "end_values_lstm.txt", sep = "\t", row.names = FALSE, col.names = TRUE)
+write.table(end_values_actual, file = "end_values_actual.txt", sep = "\t", row.names = FALSE, col.names = TRUE)
