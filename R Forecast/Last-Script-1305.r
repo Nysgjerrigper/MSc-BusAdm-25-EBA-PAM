@@ -1015,6 +1015,7 @@ ggsave(file.path(plot_dir,"plot_distribution_residuals_fwd_v2.png"), plot=plot_d
 ## Export Predicted Validation Set as .CSV ----
 write_csv(validation_results_df, "Validation_Predictions_Clean_v2.csv")
 write_csv(forecastdf_detailed, "Validation_Predictions_Detailed_v2.csv")
+write.table(validation_metrics, "Validation metrics.txt")
 
 ### Lasso selected features ----
 cat("GK Lasso Features:\n"); print(numF_gk) ; length(numF_gk)

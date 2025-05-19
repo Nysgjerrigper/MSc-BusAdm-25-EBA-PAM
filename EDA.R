@@ -3,7 +3,8 @@
 rm(list = ls(all = TRUE))
 # Load required packages for statistical description
 if (!require("pacman")) install.packages("pacman")
-pacman::p_load(pastecs,tidyverse,ggridges, xtable, moments)
+pacman::p_load(pastecs,tidyverse,ggridges, xtable, moments,
+qqplotr)
 
 # Create directory for saving plots
 setwd("C:/Users/peram/Documents/test")
@@ -76,7 +77,7 @@ dist_plot1 <- ggplot(starters_22_23, aes(x = total_points, fill = position, colo
   labs(title = "Point distribution for starting players in season 22/23 by position", 
        x = "Total points", 
        y = "Density") +
-  theme_minimal() +
+  theme_grey() +
   scale_x_continuous(breaks = seq(0, max(starters_22_23$total_points, na.rm = TRUE), 2))
 
 dist_plot2 <- ggplot(starters_23_24, aes(x = total_points, fill = position, color = position)) + 
@@ -86,7 +87,7 @@ dist_plot2 <- ggplot(starters_23_24, aes(x = total_points, fill = position, colo
   labs(title = "Point distribution for starting players in season 23/24 by position", 
        x = "Total points", 
        y = "Density") +
-  theme_minimal() +
+  theme_grey() +
   scale_x_continuous(breaks = seq(0, max(starters_23_24$total_points, na.rm = TRUE), 2))
 
 dist_plot3 <- ggplot(starters_24_25, aes(x = total_points, fill = position, color = position)) + 
@@ -96,7 +97,7 @@ dist_plot3 <- ggplot(starters_24_25, aes(x = total_points, fill = position, colo
   labs(title = "Point distribution for starting players in season 24/25 by position", 
        x = "Total points", 
        y = "Density") +
-  theme_minimal() +
+  theme_grey() +
   scale_x_continuous(breaks = seq(0, max(starters_24_25$total_points, na.rm = TRUE), 2))
 
 ## Display density plots for starters
@@ -153,7 +154,7 @@ dist_plot4 <- ggplot(players_played_1, aes(x = total_points, fill = position, co
   labs(title = "Point distribution for players with ≥1 minute (22/23)", 
        x = "Total points", 
        y = "Density") +
-  theme_minimal() +
+  theme_grey() +
   scale_x_continuous(breaks = seq(0, max(players_played_1$total_points, na.rm = TRUE), 2))
 
 dist_plot5 <- ggplot(players_played_2, aes(x = total_points, fill = position, color = position)) + 
@@ -163,7 +164,7 @@ dist_plot5 <- ggplot(players_played_2, aes(x = total_points, fill = position, co
   labs(title = "Point distribution for players with ≥1 minute (23/24)", 
        x = "Total points", 
        y = "Density") +
-  theme_minimal() +
+  theme_grey() +
   scale_x_continuous(breaks = seq(0, max(players_played_2$total_points, na.rm = TRUE), 2))
 
 dist_plot6 <- ggplot(players_played_3, aes(x = total_points, fill = position, color = position)) + 
@@ -173,7 +174,7 @@ dist_plot6 <- ggplot(players_played_3, aes(x = total_points, fill = position, co
   labs(title = "Point distribution for players with ≥1 minute (24/25)", 
        x = "Total points", 
        y = "Density") +
-  theme_minimal() +
+  theme_grey() +
   scale_x_continuous(breaks = seq(0, max(players_played_3$total_points, na.rm = TRUE), 2))
 
 # Display density plots for players with atleast 1 min of play time
@@ -226,7 +227,7 @@ dist_plot7 <- ggplot(all1, aes(x = total_points, fill = position, color = positi
   labs(title = "Point distribution for all players by position (22/23)", 
        x = "Total points", 
        y = "Density") +
-  theme_minimal() +
+  theme_grey() +
   scale_x_continuous(breaks = seq(0, max(players_played_1$total_points, na.rm = TRUE), 2))
 
 dist_plot8 <- ggplot(all2, aes(x = total_points, fill = position, color = position)) + 
@@ -236,7 +237,7 @@ dist_plot8 <- ggplot(all2, aes(x = total_points, fill = position, color = positi
   labs(title = "Point distribution for all players by position (23/24)", 
        x = "Total points", 
        y = "Density") +
-  theme_minimal() +
+  theme_grey() +
   scale_x_continuous(breaks = seq(0, max(all2$total_points, na.rm = TRUE), 2))
 
 dist_plot9 <- ggplot(all3, aes(x = total_points, fill = position, color = position)) + 
@@ -246,7 +247,7 @@ dist_plot9 <- ggplot(all3, aes(x = total_points, fill = position, color = positi
   labs(title = "Point distribution for all players by position (24/25)", 
        x = "Total points", 
        y = "Density") +
-  theme_minimal() +
+  theme_grey() +
   scale_x_continuous(breaks = seq(0, max(all3$total_points, na.rm = TRUE), 2))
 
 dist_plot7;dist_plot8;dist_plot9
@@ -324,7 +325,7 @@ box_compare_starter <- ggplot(combined_starters, aes(x = total_points, color = s
   labs(title = "Comparing boxplots across seasons for starting players",
        x = "Total points",
        y = "Density") +
-  theme_minimal()
+  theme_grey()
 
 box_compare_starter
 
@@ -344,6 +345,7 @@ gameweek_pos_ridgeline <- ggplot(combined_starters,
        x = "Total Points",
        y = "Gameweek") +
   theme_ridges() + # Apply a ridgeline theme
+  theme_grey() 
   theme(legend.position = "bottom") # Position the legend at the bottom
 
 # Display the plot and save ridge for all players
@@ -367,7 +369,7 @@ box_compare_1_min <- ggplot(combined_1_min, aes(x = total_points, color = season
   labs(title = "Comparing boxplots across seasons for players with ≥1 minutes by position",
        x = "Total points",
        y = "Density") +
-  theme_minimal()
+  theme_grey()
 
 box_compare_1_min
 
@@ -386,7 +388,7 @@ box_compare_all <- ggplot(combined_all, aes(x = total_points, color = season)) +
   labs(title = "Comparing boxplots across seasons for all players by position",
        x = "Total points",
        y = "Density") +
-  theme_minimal()
+  theme_grey()
 
 box_compare_all
 
@@ -477,90 +479,93 @@ floating = TRUE,
 latex.environments = "center",
 type = "latex")
 
-# QQ Plots to check normality ----
+# QQ Plots to check normality (using ggplot) ----
+
+## Function to create ggplot QQ plot with theme_grey
+create_qq_plot <- function(data, title) {
+  ggplot(data = data.frame(x = data), aes(sample = x)) +
+    stat_qq_point(color = "blue", size = 2) +
+    stat_qq_line(color = "red", size = 1) +
+    labs(title = title,
+         x = "Theoretical Quantiles",
+         y = "Sample Quantiles") +
+    theme_grey()
+}
+
 ## QQ Plots for starters ----
 # QQ Plot for starters 22/23
-png(file.path(plot_directory, "QQ Plot of Starters 22-23 Points.png"), width = 800, height = 600)
-qqnorm(starters_22_23$total_points, col = "blue", pch = 20,
-       main = "Q-Q Plot of Starters 22/23 Points",
-       xlab = "Theoretical Quantiles",
-       ylab = "Sample Quantiles")
-qqline(starters_22_23$total_points, col = "red", lwd = 2)
-dev.off()
+qq_starters_22_23 <- create_qq_plot(
+  starters_22_23$total_points,
+  "Q-Q Plot of Starters 22/23 Points"
+)
+ggsave(file.path(plot_directory, "QQ Plot of Starters 22-23 Points.png"), 
+       plot = qq_starters_22_23, width = 8, height = 6)
 
 # QQ Plot for starters 23/24
-png(file.path(plot_directory, "QQ Plot of Starters 23-24 Points.png"), width = 800, height = 600)
-qqnorm(starters_23_24$total_points, col = "blue", pch = 20,
-       main = "Q-Q Plot of Starters 23/24 Points",
-       xlab = "Theoretical Quantiles",
-       ylab = "Sample Quantiles")
-qqline(starters_23_24$total_points, col = "red", lwd = 2)
-dev.off()
+qq_starters_23_24 <- create_qq_plot(
+  starters_23_24$total_points,
+  "Q-Q Plot of Starters 23/24 Points"
+)
+ggsave(file.path(plot_directory, "QQ Plot of Starters 23-24 Points.png"), 
+       plot = qq_starters_23_24, width = 8, height = 6)
 
 # QQ Plot for starters 24/25
-png(file.path(plot_directory, "QQ Plot of Starters 24-25 Points.png"), width = 800, height = 600)
-qqnorm(starters_24_25$total_points, col = "blue", pch = 20,
-       main = "Q-Q Plot of Starters 24/25 Points",
-       xlab = "Theoretical Quantiles",
-       ylab = "Sample Quantiles")
-qqline(starters_24_25$total_points, col = "red", lwd = 2)
-dev.off()
+qq_starters_24_25 <- create_qq_plot(
+  starters_24_25$total_points,
+  "Q-Q Plot of Starters 24/25 Points"
+)
+ggsave(file.path(plot_directory, "QQ Plot of Starters 24-25 Points.png"), 
+       plot = qq_starters_24_25, width = 8, height = 6)
 
-# QQ Plots for players with at least 1 minute
+## QQ Plots for players with at least 1 minute ----
 # QQ Plot for players with 1+ min 22/23
-png(file.path(plot_directory, "QQ Plot of Players with 1+ Min 22-23 Points.png"), width = 800, height = 600)
-qqnorm(players_played_1$total_points, col = "blue", pch = 20,
-       main = "Q-Q Plot of Players with 1+ Min 22/23 Points",
-       xlab = "Theoretical Quantiles",
-       ylab = "Sample Quantiles")
-qqline(players_played_1$total_points, col = "red", lwd = 2)
-dev.off()
+qq_1min_22_23 <- create_qq_plot(
+  players_played_1$total_points,
+  "Q-Q Plot of Players with 1+ Min 22/23 Points"
+)
+ggsave(file.path(plot_directory, "QQ Plot of Players with 1+ Min 22-23 Points.png"), 
+       plot = qq_1min_22_23, width = 8, height = 6)
 
 # QQ Plot for players with 1+ min 23/24
-png(file.path(plot_directory, "QQ Plot of Players with 1+ Min 23-24 Points.png"), width = 800, height = 600)
-qqnorm(players_played_2$total_points, col = "blue", pch = 20,
-       main = "Q-Q Plot of Players with 1+ Min 23/24 Points",
-       xlab = "Theoretical Quantiles",
-       ylab = "Sample Quantiles")
-qqline(players_played_2$total_points, col = "red", lwd = 2)
-dev.off()
+qq_1min_23_24 <- create_qq_plot(
+  players_played_2$total_points,
+  "Q-Q Plot of Players with 1+ Min 23/24 Points"
+)
+ggsave(file.path(plot_directory, "QQ Plot of Players with 1+ Min 23-24 Points.png"), 
+       plot = qq_1min_23_24, width = 8, height = 6)
 
 # QQ Plot for players with 1+ min 24/25
-png(file.path(plot_directory, "QQ Plot of Players with 1+ Min 24-25 Points.png"), width = 800, height = 600)
-qqnorm(players_played_3$total_points, col = "blue", pch = 20,
-       main = "Q-Q Plot of Players with 1+ Min 24/25 Points",
-       xlab = "Theoretical Quantiles",
-       ylab = "Sample Quantiles")
-qqline(players_played_3$total_points, col = "red", lwd = 2)
-dev.off()
+qq_1min_24_25 <- create_qq_plot(
+  players_played_3$total_points,
+  "Q-Q Plot of Players with 1+ Min 24/25 Points"
+)
+ggsave(file.path(plot_directory, "QQ Plot of Players with 1+ Min 24-25 Points.png"), 
+       plot = qq_1min_24_25, width = 8, height = 6)
 
-# QQ Plots for all players
+## QQ Plots for all players ----
 # QQ Plot for all players 22/23
-png(file.path(plot_directory, "QQ Plot of All Players 22-23 Points.png"), width = 800, height = 600)
-qqnorm(all1$total_points, col = "blue", pch = 20,
-       main = "Q-Q Plot of All Players 22/23 Points",
-       xlab = "Theoretical Quantiles",
-       ylab = "Sample Quantiles")
-qqline(all1$total_points, col = "red", lwd = 2)
-dev.off()
+qq_all_22_23 <- create_qq_plot(
+  all1$total_points,
+  "Q-Q Plot of All Players 22/23 Points"
+)
+ggsave(file.path(plot_directory, "QQ Plot of All Players 22-23 Points.png"), 
+       plot = qq_all_22_23, width = 8, height = 6)
 
 # QQ Plot for all players 23/24
-png(file.path(plot_directory, "QQ Plot of All Players 23-24 Points.png"), width = 800, height = 600)
-qqnorm(all2$total_points, col = "blue", pch = 20,
-       main = "Q-Q Plot of All Players 23/24 Points",
-       xlab = "Theoretical Quantiles",
-       ylab = "Sample Quantiles")
-qqline(all2$total_points, col = "red", lwd = 2)
-dev.off()
+qq_all_23_24 <- create_qq_plot(
+  all2$total_points,
+  "Q-Q Plot of All Players 23/24 Points"
+)
+ggsave(file.path(plot_directory, "QQ Plot of All Players 23-24 Points.png"), 
+       plot = qq_all_23_24, width = 8, height = 6)
 
 # QQ Plot for all players 24/25
-png(file.path(plot_directory, "QQ Plot of All Players 24-25 Points.png"), width = 800, height = 600)
-qqnorm(all3$total_points, col = "blue", pch = 20,
-       main = "Q-Q Plot of All Players 24/25 Points",
-       xlab = "Theoretical Quantiles",
-       ylab = "Sample Quantiles")
-qqline(all3$total_points, col = "red", lwd = 2)
-dev.off()
+qq_all_24_25 <- create_qq_plot(
+  all3$total_points,
+  "Q-Q Plot of All Players 24/25 Points"
+)
+ggsave(file.path(plot_directory, "QQ Plot of All Players 24-25 Points.png"), 
+       plot = qq_all_24_25, width = 8, height = 6)
 
 # Additional analysis - Points by position ----
 
@@ -769,6 +774,9 @@ print(position_stats_all_23_24)
 print(position_stats_all_24_25)
 
 # After thought
+df1 <- season_22_23
+df2 <- season_23_24
+df3 <- season_24_25
 # Count unique names
 df1 |> distinct(name) |> nrow()
 df2 |> distinct(name) |> nrow()

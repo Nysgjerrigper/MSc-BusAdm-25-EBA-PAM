@@ -1,11 +1,17 @@
+rm(list = ls(all = TRUE))
 # Load required libraries
-library(ggplot2)
-library(dplyr)
-library(tidyr)
-library(stringr) # For str_extract and str_pad
+library(tidyverse)
 
 # Set working directory (adjust path as needed)
 setwd("C:/Users/peram/Documents/test/MILP Py")
+
+# Create an output directory
+output_dir <- "C:/Users/peram/Documents/test/MILP Py/output_plots"
+
+# Create the directory if it doesn't exist
+if (!dir.exists(output_dir)) {
+  dir.create(output_dir)
+}
 
 # Initialize an empty data frame to store combined data
 combined_data_lstm <- data.frame()
@@ -15,7 +21,7 @@ for (i in 1:10) {
   file_name <- paste0("Squad Selection t-auto, W77-108,SHL", i, ".csv")
   temp_data <- read.csv(file_name)
   temp_data <- temp_data %>%
-    select(gameweek, objective_gw, actual_lineup_points) %>%
+    select(gameweek, objective_gw, actual_total_points) %>%
     mutate(sub_horizon = paste0("SHL", i))
   combined_data_lstm <- rbind(combined_data_lstm, temp_data)
 }
@@ -30,48 +36,71 @@ combined_data_lstm <- combined_data_lstm %>%
 
 # Reshape data to long format for ggplot
 plot_data_lstm <- combined_data_lstm %>%
-  pivot_longer(cols = c(objective_gw, actual_lineup_points),
+  pivot_longer(cols = c(objective_gw, actual_total_points),
                names_to = "line_type",
                values_to = "points") %>%
   mutate(line_type = recode(line_type,
-                            "objective_gw" = "Objective GW",
-                            "actual_lineup_points" = "Actual Lineup"))
+                            "objective_gw" = "Forecasted Squad Points",
+                            "actual_total_points" = "Actual Squad Points"))  # FIXED: actual_lineup_points to actual_total_points
 
-# Create the original line plot
+# Create the original line plot - fixed syntax error with line_type
 p1_lstm <- ggplot(plot_data_lstm, aes(x = gameweek, y = points, color = sub_horizon, linetype = line_type)) +
   geom_line(size = 0.8) +
-  labs(title = "Gameweek Points by Sub-Horizon and Line Type (LSTM)",
+  labs(title = "Gameweek Points by Sub-Horizon, Squads from forecasts with actual squad points",
        x = "Gameweek (GW)",
        y = "Points",
        color = "Sub-Horizon",
        linetype = "Line Type") +
-  theme_gray() +
+  theme_grey() +
   theme(legend.position = "right")
 print(p1_lstm)
-ggsave("fantasy_points_plot_lstm.png", plot = p1_lstm, width = 10, height = 6) # Increased width for legend
+ggsave(file.path(output_dir, "fantasy_points_plot_lstm.png"), plot = p1_lstm, width = 10, height = 6) # Increased width for legend
 
 # --- CUMULATIVE PLOT FOR LSTM DATA ---
-cumulative_plot_data_lstm <- combined_data_lstm %>% # Use already factor-ordered combined_data_lstm
+cumulative_plot_data_lstm <- combined_data_lstm %>%
   group_by(sub_horizon) %>%
   arrange(gameweek) %>%
-  mutate(cumulative_objective_points = cumsum(objective_gw)) %>%
+  mutate(
+    forecast_cumu = cumsum(objective_gw),
+    actual_cumu = cumsum(actual_total_points)
+  ) %>%
   ungroup()
 
-p_cumulative_lstm <- ggplot(cumulative_plot_data_lstm, aes(x = gameweek, y = cumulative_objective_points, color = sub_horizon)) +
+# Create long format for cumulative plot with both metrics
+cumulative_plot_data_lstm_long <- cumulative_plot_data_lstm %>%
+  pivot_longer(
+    cols = c(forecast_cumu, actual_cumu),
+    names_to = "cumulative_type",
+    values_to = "cumulative_points"
+  ) %>%
+  mutate(cumulative_type = recode(cumulative_type,
+                                 "forecast_cumu" = "Cumulative Forecasted Squad Points",
+                                 "actual_cumu" = "Cumulative Actual Squad Points"))
+
+# Updated cumulative plot for LSTM
+p_cumulative_lstm <- ggplot(cumulative_plot_data_lstm_long, 
+       aes(x = gameweek, y = cumulative_points, color = sub_horizon, linetype = cumulative_type)) +
   geom_line(size = 0.8) +
-  labs(title = "Cumulative Objective GW Points by Sub-Horizon (LSTM)",
+  labs(title = "Cumulative Points by Sub-Horizon (LSTM)",
        x = "Gameweek (GW)",
-       y = "Cumulative Objective GW Points",
-       color = "Sub-Horizon") +
-  theme_gray() +
+       y = "Cumulative Points",
+       color = "Sub-Horizon",
+       linetype = "Point Type") +
+  theme_grey() +
   theme(legend.position = "right")
 print(p_cumulative_lstm)
-ggsave("cumulative_fantasy_points_plot_lstm.png", plot = p_cumulative_lstm, width = 10, height = 6)
+ggsave(file.path(output_dir, "cumulative_fantasy_points_plot_lstm.png"), plot = p_cumulative_lstm, width = 10, height = 6)
 
+# Extract end values for LSTM - include both metrics
 end_values_lstm <- cumulative_plot_data_lstm %>%
   group_by(sub_horizon) %>%
   filter(gameweek == max(gameweek)) %>%
-  select(sub_horizon, end_gameweek = gameweek, final_cumulative_points = cumulative_objective_points) %>%
+  select(
+    sub_horizon, 
+    end_gameweek = gameweek, 
+    final_forecasted_points = forecast_cumu,
+    final_actual_points = actual_cumu
+  ) %>%
   ungroup()
 cat("\n--- End Cumulative Values for LSTM Data ---\n")
 
@@ -110,44 +139,157 @@ plot_data_actual <- combined_data_actual %>%
 
 p1_actual <- ggplot(plot_data_actual, aes(x = gameweek, y = points, color = sub_horizon, linetype = line_type)) +
   geom_line(size = 0.8) +
-  labs(title = "Gameweek Points by Sub-Horizon (Actual Data)",
+  labs(title = "Optimised Gameweek Squad Points by Sub-Horizon, with actual data",
        x = "Gameweek (GW)",
        y = "Points",
        color = "Sub-Horizon",
        linetype = "Line Type") +
-  theme_gray() +
+  theme_grey() +
   theme(legend.position = "right")
 print(p1_actual)
-ggsave("fantasy_points_plot_actual.png", plot = p1_actual, width = 10, height = 6)
+ggsave(file.path(output_dir, "fantasy_points_plot_actual.png"), plot = p1_actual, width = 10, height = 6)
 
 
 # --- CUMULATIVE PLOT FOR ACTUAL DATA ---
 cumulative_plot_data_actual <- combined_data_actual %>% # Use already factor-ordered combined_data_actual
   group_by(sub_horizon) %>%
   arrange(gameweek) %>%
-  mutate(cumulative_objective_points = cumsum(objective_gw)) %>%
+  mutate(forecast_cumu = cumsum(objective_gw)) %>%
   ungroup()
 
-p_cumulative_actual <- ggplot(cumulative_plot_data_actual, aes(x = gameweek, y = cumulative_objective_points, color = sub_horizon)) +
+p_cumulative_actual <- ggplot(cumulative_plot_data_actual, aes(x = gameweek, y = forecast_cumu, color = sub_horizon)) +
   geom_line(size = 0.5) +
-  labs(title = "Cumulative Objective GW Points by Sub-Horizon (Actual Data)",
+  labs(title = "Cumulative Objective GW Squad Points by Sub-Horizon, with actual data",
        x = "Gameweek (GW)",
        y = "Cumulative Objective GW Points",
        color = "Sub-Horizon") +
   theme_grey() +
   theme(legend.position = "right")
 print(p_cumulative_actual)
-ggsave("cumulative_fantasy_points_plot_actual.png", plot = p_cumulative_actual, width = 10, height = 6)
+ggsave(file.path(output_dir, "cumulative_fantasy_points_plot_actual.png"), plot = p_cumulative_actual, width = 10, height = 6)
 
 end_values_actual <- cumulative_plot_data_actual %>%
   group_by(sub_horizon) %>%
   filter(gameweek == max(gameweek)) %>%
-  select(sub_horizon, end_gameweek = gameweek, final_cumulative_points = cumulative_objective_points) %>%
+  select(sub_horizon, end_gameweek = gameweek, final_cumulative_points = forecast_cumu) %>%
   ungroup()
 cat("\n--- End Cumulative Values for Actual Data ---\n")
 
 end_values_actual_x <- print(xtable::xtable(end_values_actual))
 
-#Exp tables to txt
-write.table(end_values_lstm, file = "end_values_lstm.txt", sep = "\t", row.names = FALSE, col.names = TRUE)
-write.table(end_values_actual, file = "end_values_actual.txt", sep = "\t", row.names = FALSE, col.names = TRUE)
+# FORCED GAMECHIPS SUB in range(1,5)
+combined_data_forced <- data.frame()
+
+# Loop through the 5 files with forced gamechips
+for (i in 1:5) {
+  file_name <- paste0("Squad Selection t-auto-hard, W77-108,SHL", i, ".csv")
+  temp_data <- read.csv(file_name)
+  temp_data <- temp_data %>%
+    select(gameweek, objective_gw, actual_total_points) %>%  # Added actual_total_points
+    mutate(sub_horizon = paste0("SHL", i))
+  combined_data_forced <- rbind(combined_data_forced, temp_data)
+}
+
+# Fix sub-horizon order for forced gamechips data
+horizon_numbers_forced <- as.integer(stringr::str_extract(unique(combined_data_forced$sub_horizon), "\\d+"))
+ordered_levels_forced <- paste0("SHL", sort(horizon_numbers_forced))
+
+combined_data_forced <- combined_data_forced %>%
+  mutate(sub_horizon = factor(sub_horizon, levels = ordered_levels_forced))
+
+# Create line plot for forced gamechips data with both metrics
+plot_data_forced <- combined_data_forced %>%
+  pivot_longer(cols = c(objective_gw, actual_total_points),  # Added actual_total_points
+               names_to = "line_type",
+               values_to = "points") %>%
+  mutate(line_type = recode(line_type,
+                           "objective_gw" = "Forecasted Squad Points",
+                           "actual_total_points" = "Actual Squad Points"))
+
+p1_forced <- ggplot(plot_data_forced, aes(x = gameweek, y = points, color = sub_horizon, linetype = line_type)) +
+  geom_line(size = 0.8) +
+  labs(title = "Gameweek Points by Sub-Horizon (Forced Gamechips)",
+       x = "Gameweek (GW)",
+       y = "Points",
+       color = "Sub-Horizon",
+       linetype = "Line Type") +
+  theme_grey() +
+  theme(legend.position = "right")
+print(p1_forced)
+ggsave(file.path(output_dir, "fantasy_points_plot_forced.png"), plot = p1_forced, width = 10, height = 6)
+
+# Create cumulative plot for forced gamechips data with both metrics
+cumulative_plot_data_forced <- combined_data_forced %>%
+  group_by(sub_horizon) %>%
+  arrange(gameweek) %>%
+  mutate(
+    forecast_cumu = cumsum(objective_gw),
+    actual_cumu = cumsum(actual_total_points)  # Added actual cumulative
+  ) %>%
+  ungroup()
+
+# Create long format for cumulative plot
+cumulative_plot_data_forced_long <- cumulative_plot_data_forced %>%
+  pivot_longer(
+    cols = c(forecast_cumu, actual_cumu),
+    names_to = "cumulative_type",
+    values_to = "cumulative_points"
+  ) %>%
+  mutate(cumulative_type = recode(cumulative_type,
+                                 "forecast_cumu" = "Cumulative Forecasted Squad Points",
+                                 "actual_cumu" = "Cumulative Actual Squad Points"))
+
+p_cumulative_forced <- ggplot(cumulative_plot_data_forced_long, 
+       aes(x = gameweek, y = cumulative_points, color = sub_horizon, linetype = cumulative_type)) +
+  geom_line(size = 0.8) +
+  labs(title = "Cumulative Points by Sub-Horizon (Forced Gamechips)",
+       x = "Gameweek (GW)",
+       y = "Cumulative Points",
+       color = "Sub-Horizon",
+       linetype = "Point Type") +
+  theme_grey() +
+  theme(legend.position = "right")
+print(p_cumulative_forced)
+ggsave(file.path(output_dir, "cumulative_fantasy_points_plot_forced.png"), plot = p_cumulative_forced, width = 10, height = 6)
+
+# Extract end values for forced gamechips - include both metrics
+end_values_forced <- cumulative_plot_data_forced %>%
+  group_by(sub_horizon) %>%
+  filter(gameweek == max(gameweek)) %>%
+  select(
+    sub_horizon, 
+    end_gameweek = gameweek, 
+    final_forecasted_points = forecast_cumu,
+    final_actual_points = actual_cumu
+  ) %>%
+  ungroup()
+
+# Create a combined comparison table with all models and both metrics
+all_end_values <- bind_rows(
+  mutate(end_values_lstm, model_type = "LSTM"),
+  mutate(end_values_actual %>% 
+           rename(final_forecasted_points = final_cumulative_points) %>%
+           mutate(final_actual_points = NA), 
+         model_type = "Actual"),
+  mutate(end_values_forced, model_type = "Forced")
+) %>%
+  # Reorder columns for better readability
+  select(model_type, sub_horizon, end_gameweek, final_forecasted_points, final_actual_points)
+
+# Create a comprehensive table
+comprehensive_xtable <- xtable::xtable(
+  all_end_values, 
+  caption = "Comprehensive Comparison of All Models and Sub-Horizons",
+  digits = c(0, 0, 0, 0, 1, 1)  # Format decimal places
+)
+
+# Save as a single text file with proper formatting
+capture.output(
+  print(comprehensive_xtable, 
+        include.rownames = FALSE,
+        caption.placement = "top"), 
+  file = file.path(output_dir, "comprehensive_model_comparison.txt")
+)
+
+# Print confirmation message
+cat("All files saved to directory:", output_dir, "\n")
