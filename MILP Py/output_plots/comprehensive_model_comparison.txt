@@ -1,8 +1,7 @@
 % latex table generated in R 4.4.2 by xtable 1.8-4 package
-% Tue May 20 11:00:18 2025
+% Tue May 20 13:09:38 2025
 \begin{table}[ht]
 \centering
-\caption{Comprehensive Comparison of All Models and Sub-Horizons} 
 \begin{tabular}{llrrr}
   \hline
 model\_type & sub\_horizon & end\_gameweek & final\_forecasted\_points & final\_actual\_points \\ 
@@ -39,4 +38,5 @@ LSTM & SHL1 & 107 & 1627 & 1459 \\
   Actual Forced & SHL5 & 107 &  & 3982 \\ 
    \hline
 \end{tabular}
+\caption{Comprehensive Comparison of All Models and Sub-Horizons} 
 \end{table}

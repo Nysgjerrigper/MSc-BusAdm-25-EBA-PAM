@@ -1,6 +1,7 @@
 rm(list = ls(all = TRUE))
 # Load required libraries
 library(tidyverse)
+library(xtable)
 
 # Set to git folder
 setwd("C:/Users/peram/Documents/test")
@@ -20,11 +21,43 @@ res <- df |>
   mutate(residuals = actual_total_points - predicted_total_points) |> 
   mutate(ressqr = residuals^2)
 
-# Calculate MSE and RMSE by position
+# Create a residuals distribution plot by position
+# First, ensure residuals are calculated
+res <- res |> 
+  mutate(residuals = actual_total_points - predicted_total_points) |> 
+  mutate(ressqr = residuals^2)
+
+# Ensure position is ordered the same way as in EDA
+res <- res |> 
+  mutate(position = factor(position, levels = c("GK", "DEF", "MID", "FWD")))
+
+# Create density plots faceted by position with matching color scheme
+position_residuals_plot <- ggplot(res, aes(x = residuals, fill = position, color = position)) +
+  geom_density(alpha = 0.2) +  # Changed to 0.2 to match EDA
+  facet_wrap(~ position) +
+  scale_color_brewer(palette = "Set1") +  # Added to match EDA
+  scale_fill_brewer(palette = "Set1") +   # Added to match EDA
+  labs(title = "Distribution of Prediction Residuals by Player Position",
+       x = "Residuals (Actual - Predicted)",
+       y = "Density") +
+  theme_grey() +
+  geom_vline(xintercept = 0, linetype = "dashed", color = "red") +
+  theme(legend.position = "bottom")
+
+# Display the plot
+print(position_residuals_plot)
+
+# Save the plot to the output directory
+ggsave(file.path(output_dir, "position_residuals_distribution.png"), 
+       plot = position_residuals_plot, 
+       width = 10, height = 8)
+
+# Calculate MSE and RMSE by position - UPDATED to include mean residuals
 mse_rmse_by_position <- res |> 
   group_by(position) |> 
   summarize(
     n = n(),
+    mean_residual = mean(residuals),  # Add mean of raw residuals
     mse = mean(ressqr),
     rmse = sqrt(mean(ressqr)),
     mean_actual = mean(actual_total_points),
@@ -32,11 +65,12 @@ mse_rmse_by_position <- res |>
   ) |>
   ungroup()
 
-# Calculate overall MSE and RMSE
+# Calculate overall MSE and RMSE - UPDATED to include mean residuals
 overall_mse_rmse <- res |> 
   summarize(
     position = "ALL",
     n = n(),
+    mean_residual = mean(residuals),  # Add mean of raw residuals
     mse = mean(ressqr),
     rmse = sqrt(mean(ressqr)),
     mean_actual = mean(actual_total_points),
@@ -346,7 +380,7 @@ for (i in 1:5) {
   combined_data_actual_forced <- rbind(combined_data_actual_forced, temp_data)
 }
 # Hot fix
-combined_data_actual_forced <- combined_data_actual_forced|> 
+combined_data_actual_forced <- combined_data_actual_forced |> 
   mutate(actual_total_points = actual_total_points - alpha*transfer_penalty)
 
 # Fix sub-horizon order for actual forced gamechips data
@@ -400,7 +434,7 @@ end_values_actual_forced <- cumulative_plot_data_actual_forced %>%
   filter(gameweek == max(gameweek)) %>%
   select(
     sub_horizon, 
-    end_gameweek = gameweek,
+    end_gameweek = gameweek, 
     final_actual_points = actual_cumu
   ) %>%
   ungroup()
@@ -432,9 +466,21 @@ comprehensive_xtable <- xtable::xtable(
 capture.output(
   print(comprehensive_xtable, 
         include.rownames = FALSE,
-        caption.placement = "top"), 
+        caption.placement = "bottom"), 
   file = file.path(output_dir, "comprehensive_model_comparison.txt")
 )
 
-# Print confirmation message
-cat("All files saved to directory:", output_dir, "\n")
+# Create a separate well-formatted table for the residual analysis - UPDATED for new column
+residual_xtable <- xtable(
+  all_metrics, 
+  caption = "Prediction Error Metrics by Position",
+  digits = c(0, 0, 0, 2, 2, 2, 2,2)  # Added digit for new column
+)
+
+# Save the residual analysis to a separate file
+capture.output(
+  print(residual_xtable, 
+        include.rownames = FALSE,
+        caption.placement = "bottom"), 
+  file = file.path(output_dir, "detailed_residual_analysis.txt")
+)
