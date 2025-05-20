@@ -1,5 +1,5 @@
 % latex table generated in R 4.4.2 by xtable 1.8-4 package
-% Mon May 19 17:44:05 2025
+% Tue May 20 09:16:20 2025
 \begin{table}[ht]
 \centering
 \caption{Comprehensive Comparison of All Models and Sub-Horizons} 
@@ -7,31 +7,36 @@
   \hline
 model\_type & sub\_horizon & end\_gameweek & final\_forecasted\_points & final\_actual\_points \\ 
   \hline
-LSTM & SHL1 & 107 & 1627.0 & 1459 \\ 
-  LSTM & SHL2 & 107 & 1672.6 & 1516 \\ 
-  LSTM & SHL3 & 107 & 1682.7 & 1526 \\ 
-  LSTM & SHL4 & 107 & 1688.2 & 1502 \\ 
-  LSTM & SHL5 & 107 & 1684.9 & 1515 \\ 
-  LSTM & SHL6 & 107 & 1681.6 & 1533 \\ 
-  LSTM & SHL7 & 107 & 1685.7 & 1525 \\ 
-  LSTM & SHL8 & 107 & 1683.5 & 1534 \\ 
-  LSTM & SHL9 & 107 & 1685.5 & 1526 \\ 
-  LSTM & SHL10 & 107 & 1685.8 & 1521 \\ 
-  Actual & SHL1 & 107 & 3794.1 &  \\ 
-  Actual & SHL2 & 107 & 3923.5 &  \\ 
-  Actual & SHL3 & 107 & 3956.1 &  \\ 
-  Actual & SHL4 & 107 & 3970.0 &  \\ 
-  Actual & SHL5 & 107 & 3993.0 &  \\ 
-  Actual & SHL6 & 107 & 3986.8 &  \\ 
-  Actual & SHL7 & 107 & 3984.8 &  \\ 
-  Actual & SHL8 & 107 & 3982.9 &  \\ 
-  Actual & SHL9 & 107 & 3987.9 &  \\ 
-  Actual & SHL10 & 107 & 3984.7 &  \\ 
-  Forced & SHL1 & 107 & 1652.2 & 1509 \\ 
-  Forced & SHL2 & 107 & 1698.1 & 1537 \\ 
-  Forced & SHL3 & 107 & 1706.8 & 1572 \\ 
-  Forced & SHL4 & 107 & 1709.3 & 1574 \\ 
-  Forced & SHL5 & 107 & 1699.6 & 1546 \\ 
+LSTM & SHL1 & 107 & 1627 & 1459 \\ 
+  LSTM & SHL2 & 107 & 1673 & 1516 \\ 
+  LSTM & SHL3 & 107 & 1683 & 1526 \\ 
+  LSTM & SHL4 & 107 & 1688 & 1502 \\ 
+  LSTM & SHL5 & 107 & 1685 & 1515 \\ 
+  LSTM & SHL6 & 107 & 1682 & 1533 \\ 
+  LSTM & SHL7 & 107 & 1686 & 1525 \\ 
+  LSTM & SHL8 & 107 & 1684 & 1534 \\ 
+  LSTM & SHL9 & 107 & 1685 & 1526 \\ 
+  LSTM & SHL10 & 107 & 1686 & 1521 \\ 
+  Actual & SHL1 & 107 & 3794 &  \\ 
+  Actual & SHL2 & 107 & 3923 &  \\ 
+  Actual & SHL3 & 107 & 3956 &  \\ 
+  Actual & SHL4 & 107 & 3970 &  \\ 
+  Actual & SHL5 & 107 & 3993 &  \\ 
+  Actual & SHL6 & 107 & 3987 &  \\ 
+  Actual & SHL7 & 107 & 3985 &  \\ 
+  Actual & SHL8 & 107 & 3983 &  \\ 
+  Actual & SHL9 & 107 & 3988 &  \\ 
+  Actual & SHL10 & 107 & 3985 &  \\ 
+  Forced & SHL1 & 107 & 1652 & 1509 \\ 
+  Forced & SHL2 & 107 & 1698 & 1537 \\ 
+  Forced & SHL3 & 107 & 1707 & 1572 \\ 
+  Forced & SHL4 & 107 & 1709 & 1574 \\ 
+  Forced & SHL5 & 107 & 1700 & 1546 \\ 
+  Actual Forced & SHL1 & 107 &  & 4468 \\ 
+  Actual Forced & SHL2 & 107 &  & 4485 \\ 
+  Actual Forced & SHL3 & 107 &  & 4490 \\ 
+  Actual Forced & SHL4 & 107 &  & 4488 \\ 
+  Actual Forced & SHL5 & 107 &  & 4478 \\ 
    \hline
 \end{tabular}
 \end{table}

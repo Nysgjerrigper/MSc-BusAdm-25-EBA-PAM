@@ -2,8 +2,8 @@ rm(list = ls(all = TRUE))
 # Load required libraries
 library(tidyverse)
 
-# Set working directory (adjust path as needed)
-setwd("C:/Users/peram/Documents/test/MILP Py")
+# Set to git folder
+setwd("C:/Users/peram/Documents/test")
 
 # Create an output directory
 output_dir <- "C:/Users/peram/Documents/test/MILP Py/output_plots"
@@ -12,6 +12,61 @@ output_dir <- "C:/Users/peram/Documents/test/MILP Py/output_plots"
 if (!dir.exists(output_dir)) {
   dir.create(output_dir)
 }
+
+# Post train residuals
+df <- read_csv("Validation_Predictions_Clean_v2.csv")
+colnames(df)
+res <- df |> 
+  mutate(residuals = actual_total_points - predicted_total_points) |> 
+  mutate(ressqr = residuals^2)
+
+# Calculate MSE and RMSE by position
+mse_rmse_by_position <- res |> 
+  group_by(position) |> 
+  summarize(
+    n = n(),
+    mse = mean(ressqr),
+    rmse = sqrt(mean(ressqr)),
+    mean_actual = mean(actual_total_points),
+    mean_predicted = mean(predicted_total_points)
+  ) |>
+  ungroup()
+
+# Calculate overall MSE and RMSE
+overall_mse_rmse <- res |> 
+  summarize(
+    position = "ALL",
+    n = n(),
+    mse = mean(ressqr),
+    rmse = sqrt(mean(ressqr)),
+    mean_actual = mean(actual_total_points),
+    mean_predicted = mean(predicted_total_points)
+  )
+
+# Combine position-specific and overall metrics
+all_metrics <- bind_rows(mse_rmse_by_position, overall_mse_rmse) |>
+  arrange(position != "ALL", mse)
+
+# Print the results
+print(all_metrics)
+
+# Create a formatted table
+metrics_table <- xtable::xtable(
+  all_metrics,
+  caption = "Post Training Metrics by Player Position",
+  digits = c(0, 0, 0, 2, 2, 2, 2)
+)
+# Save the xtable output to a text file
+capture.output(
+  print(metrics_table, 
+        include.rownames = FALSE,
+        caption.placement = "top"),
+  file = file.path(output_dir, "position_error_metrics.txt")
+)
+
+# Forecasted ----
+# Set working directory (adjust path as needed)
+setwd("C:/Users/peram/Documents/test/MILP Py")
 
 # Initialize an empty data frame to store combined data
 combined_data_lstm <- data.frame()
@@ -45,7 +100,7 @@ plot_data_lstm <- combined_data_lstm %>%
 
 # Create the original line plot - fixed syntax error with line_type
 p1_lstm <- ggplot(plot_data_lstm, aes(x = gameweek, y = points, color = sub_horizon, linetype = line_type)) +
-  geom_line(size = 0.8) +
+  geom_line(linewidth = 0.8) +
   labs(title = "Gameweek Points by Sub-Horizon, Squads from forecasts with actual squad points",
        x = "Gameweek (GW)",
        y = "Points",
@@ -80,7 +135,7 @@ cumulative_plot_data_lstm_long <- cumulative_plot_data_lstm %>%
 # Updated cumulative plot for LSTM
 p_cumulative_lstm <- ggplot(cumulative_plot_data_lstm_long, 
        aes(x = gameweek, y = cumulative_points, color = sub_horizon, linetype = cumulative_type)) +
-  geom_line(size = 0.8) +
+  geom_line(linewidth = 0.8) +
   labs(title = "Cumulative Points by Sub-Horizon (LSTM)",
        x = "Gameweek (GW)",
        y = "Cumulative Points",
@@ -138,7 +193,7 @@ plot_data_actual <- combined_data_actual %>%
                             "objective_gw" = "Objective GW"))
 
 p1_actual <- ggplot(plot_data_actual, aes(x = gameweek, y = points, color = sub_horizon, linetype = line_type)) +
-  geom_line(size = 0.8) +
+  geom_line(linewidth = 0.8) +
   labs(title = "Optimised Gameweek Squad Points by Sub-Horizon, with actual data",
        x = "Gameweek (GW)",
        y = "Points",
@@ -158,10 +213,10 @@ cumulative_plot_data_actual <- combined_data_actual %>% # Use already factor-ord
   ungroup()
 
 p_cumulative_actual <- ggplot(cumulative_plot_data_actual, aes(x = gameweek, y = forecast_cumu, color = sub_horizon)) +
-  geom_line(size = 0.5) +
-  labs(title = "Cumulative Objective GW Squad Points by Sub-Horizon, with actual data",
+  geom_line(linewidth = 0.5) +
+  labs(title = "Cumulative Optimal Squad Points by Sub-Horizon, with actual data",
        x = "Gameweek (GW)",
-       y = "Cumulative Objective GW Points",
+       y = "Cumulative Points",
        color = "Sub-Horizon") +
   theme_grey() +
   theme(legend.position = "right")
@@ -207,7 +262,7 @@ plot_data_forced <- combined_data_forced %>%
                            "actual_total_points" = "Actual Squad Points"))
 
 p1_forced <- ggplot(plot_data_forced, aes(x = gameweek, y = points, color = sub_horizon, linetype = line_type)) +
-  geom_line(size = 0.8) +
+  geom_line(linewidth = 0.8) +
   labs(title = "Gameweek Points by Sub-Horizon (Forced Gamechips)",
        x = "Gameweek (GW)",
        y = "Points",
@@ -241,7 +296,7 @@ cumulative_plot_data_forced_long <- cumulative_plot_data_forced %>%
 
 p_cumulative_forced <- ggplot(cumulative_plot_data_forced_long, 
        aes(x = gameweek, y = cumulative_points, color = sub_horizon, linetype = cumulative_type)) +
-  geom_line(size = 0.8) +
+  geom_line(linewidth = 0.8) +
   labs(title = "Cumulative Points by Sub-Horizon (Forced Gamechips)",
        x = "Gameweek (GW)",
        y = "Cumulative Points",
@@ -264,14 +319,87 @@ end_values_forced <- cumulative_plot_data_forced %>%
   ) %>%
   ungroup()
 
-# Create a combined comparison table with all models and both metrics
+# ACTUAL FORCED GAMECHIPS SUB in range(1,5)
+combined_data_actual_forced <- data.frame()
+
+# Loop through the 5 files with actual forced gamechips
+for (i in 1:5) {
+  file_name <- paste0("Squad Selection t-auto-forced-actual, W77-108,SHL", i, ".csv")
+  temp_data <- read.csv(file_name)
+  temp_data <- temp_data %>%
+    select(gameweek, actual_total_points) %>%  # Only using actual points here
+    mutate(sub_horizon = paste0("SHL", i))
+  combined_data_actual_forced <- rbind(combined_data_actual_forced, temp_data)
+}
+
+# Fix sub-horizon order for actual forced gamechips data
+horizon_numbers_actual_forced <- as.integer(stringr::str_extract(unique(combined_data_actual_forced$sub_horizon), "\\d+"))
+ordered_levels_actual_forced <- paste0("SHL", sort(horizon_numbers_actual_forced))
+
+combined_data_actual_forced <- combined_data_actual_forced %>%
+  mutate(sub_horizon = factor(sub_horizon, levels = ordered_levels_actual_forced))
+
+# Create line plot for actual forced gamechips data
+plot_data_actual_forced <- combined_data_actual_forced %>%
+  pivot_longer(cols = actual_total_points,
+               names_to = "line_type",
+               values_to = "points") %>%
+  mutate(line_type = recode(line_type, 
+                           "actual_total_points" = "Actual Squad Points"))
+
+p1_actual_forced <- ggplot(plot_data_actual_forced, aes(x = gameweek, y = points, color = sub_horizon, linetype = line_type)) +
+  geom_line(linewidth = 0.8) +
+  labs(title = "Gameweek Points by Sub-Horizon (Actual Forced Gamechips)",
+       x = "Gameweek (GW)",
+       y = "Points",
+       color = "Sub-Horizon",
+       linetype = "Line Type") +
+  theme_grey() +
+  theme(legend.position = "right")
+print(p1_actual_forced)
+ggsave(file.path(output_dir, "fantasy_points_plot_actual_forced.png"), plot = p1_actual_forced, width = 10, height = 6)
+
+# Create cumulative plot for actual forced gamechips data
+cumulative_plot_data_actual_forced <- combined_data_actual_forced %>%
+  group_by(sub_horizon) %>%
+  arrange(gameweek) %>%
+  mutate(actual_cumu = cumsum(actual_total_points)) %>%
+  ungroup()
+
+p_cumulative_actual_forced <- ggplot(cumulative_plot_data_actual_forced, aes(x = gameweek, y = actual_cumu, color = sub_horizon)) +
+  geom_line(linewidth = 0.5) +
+  labs(title = "Cumulative Actual Squad Points by Sub-Horizon (Actual Forced Gamechips)",
+       x = "Gameweek (GW)",
+       y = "Cumulative Actual Points",
+       color = "Sub-Horizon") +
+  theme_grey() +
+  theme(legend.position = "right")
+print(p_cumulative_actual_forced)
+ggsave(file.path(output_dir, "cumulative_fantasy_points_plot_actual_forced.png"), plot = p_cumulative_actual_forced, width = 10, height = 6)
+
+# Extract end values for actual forced gamechips
+end_values_actual_forced <- cumulative_plot_data_actual_forced %>%
+  group_by(sub_horizon) %>%
+  filter(gameweek == max(gameweek)) %>%
+  select(
+    sub_horizon, 
+    end_gameweek = gameweek,
+    final_actual_points = actual_cumu
+  ) %>%
+  ungroup()
+
+# Update the combined comparison table to include the new model
 all_end_values <- bind_rows(
   mutate(end_values_lstm, model_type = "LSTM"),
   mutate(end_values_actual %>% 
            rename(final_forecasted_points = final_cumulative_points) %>%
            mutate(final_actual_points = NA), 
          model_type = "Actual"),
-  mutate(end_values_forced, model_type = "Forced")
+  mutate(end_values_forced, model_type = "Forced"),
+  # Add actual_forced with NA for forecasted points to match column structure
+  mutate(end_values_actual_forced %>%
+           mutate(final_forecasted_points = NA), 
+         model_type = "Actual Forced")
 ) %>%
   # Reorder columns for better readability
   select(model_type, sub_horizon, end_gameweek, final_forecasted_points, final_actual_points)
@@ -280,7 +408,7 @@ all_end_values <- bind_rows(
 comprehensive_xtable <- xtable::xtable(
   all_end_values, 
   caption = "Comprehensive Comparison of All Models and Sub-Horizons",
-  digits = c(0, 0, 0, 0, 1, 1)  # Format decimal places
+  digits = c(0, 0, 0, 0, 0, 0)  # Format decimal places
 )
 
 # Save as a single text file with proper formatting
