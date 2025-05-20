@@ -76,10 +76,16 @@ for (i in 1:10) {
   file_name <- paste0("Squad Selection t-auto, W77-108,SHL", i, ".csv")
   temp_data <- read.csv(file_name)
   temp_data <- temp_data %>%
-    select(gameweek, objective_gw, actual_total_points) %>%
+    select(gameweek, objective_gw, actual_total_points, alpha) %>%
     mutate(sub_horizon = paste0("SHL", i))
   combined_data_lstm <- rbind(combined_data_lstm, temp_data)
 }
+
+# FIX actual_total_points to be net
+colnames(combined_data_lstm)
+transfer_penalty <- 4
+combined_data_lstm <- combined_data_lstm |> 
+  mutate(actual_total_points = actual_total_points - alpha*transfer_penalty)
 
 # --- FIX SUB-HORIZON ORDER FOR LSTM ---
 # Extract numeric part and order
@@ -88,6 +94,7 @@ ordered_levels_lstm <- paste0("SHL", sort(horizon_numbers_lstm))
 
 combined_data_lstm <- combined_data_lstm %>%
   mutate(sub_horizon = factor(sub_horizon, levels = ordered_levels_lstm))
+
 
 # Reshape data to long format for ggplot
 plot_data_lstm <- combined_data_lstm %>%
@@ -171,12 +178,15 @@ for (i in 1:10) {
   file_name <- paste0("Squad Selection t-auto-actual, W77-108,SHL", i, ".csv")
   temp_data <- read.csv(file_name)
   temp_data <- temp_data %>%
-    select(gameweek, objective_gw) %>%
+    select(gameweek, actual_total_points, alpha) %>%
     mutate(sub_horizon = paste0("SHL", i))
   combined_data_actual <- rbind(combined_data_actual, temp_data)
 }
+# Hot fix 
+combined_data_actual <- combined_data_actual |> 
+  mutate(actual_total_points = actual_total_points - alpha*transfer_penalty)
 
-# --- FIX SUB-HORIZON ORDER FOR ACTUAL ---
+
 # Extract numeric part and order
 horizon_numbers_actual <- as.integer(stringr::str_extract(unique(combined_data_actual$sub_horizon), "\\d+"))
 ordered_levels_actual <- paste0("SHL", sort(horizon_numbers_actual))
@@ -186,15 +196,15 @@ combined_data_actual <- combined_data_actual %>%
 
 
 plot_data_actual <- combined_data_actual %>%
-  pivot_longer(cols = objective_gw,
+  pivot_longer(cols = actual_total_points,
                names_to = "line_type",
                values_to = "points") %>%
   mutate(line_type = recode(line_type,
-                            "objective_gw" = "Objective GW"))
+                            "actual_total_points" = "Actual Points"))
 
 p1_actual <- ggplot(plot_data_actual, aes(x = gameweek, y = points, color = sub_horizon, linetype = line_type)) +
   geom_line(linewidth = 0.8) +
-  labs(title = "Optimised Gameweek Squad Points by Sub-Horizon, with actual data",
+  labs(title = "Optimised Squad Points Gameweek by Sub-Horizon, with actual data",
        x = "Gameweek (GW)",
        y = "Points",
        color = "Sub-Horizon",
@@ -209,7 +219,7 @@ ggsave(file.path(output_dir, "fantasy_points_plot_actual.png"), plot = p1_actual
 cumulative_plot_data_actual <- combined_data_actual %>% # Use already factor-ordered combined_data_actual
   group_by(sub_horizon) %>%
   arrange(gameweek) %>%
-  mutate(forecast_cumu = cumsum(objective_gw)) %>%
+  mutate(forecast_cumu = cumsum(actual_total_points)) %>%
   ungroup()
 
 p_cumulative_actual <- ggplot(cumulative_plot_data_actual, aes(x = gameweek, y = forecast_cumu, color = sub_horizon)) +
@@ -232,7 +242,7 @@ cat("\n--- End Cumulative Values for Actual Data ---\n")
 
 end_values_actual_x <- print(xtable::xtable(end_values_actual))
 
-# FORCED GAMECHIPS SUB in range(1,5)
+# FORCED GAMECHIPS SUB in range(1,5) for predicted ----
 combined_data_forced <- data.frame()
 
 # Loop through the 5 files with forced gamechips
@@ -240,10 +250,14 @@ for (i in 1:5) {
   file_name <- paste0("Squad Selection t-auto-hard, W77-108,SHL", i, ".csv")
   temp_data <- read.csv(file_name)
   temp_data <- temp_data %>%
-    select(gameweek, objective_gw, actual_total_points) %>%  # Added actual_total_points
+    select(gameweek, objective_gw, actual_total_points, alpha) %>%  # Added actual_total_points
     mutate(sub_horizon = paste0("SHL", i))
   combined_data_forced <- rbind(combined_data_forced, temp_data)
 }
+# Hot fix
+combined_data_forced <- combined_data_forced |> 
+  mutate(actual_total_points = actual_total_points - alpha*transfer_penalty)
+
 
 # Fix sub-horizon order for forced gamechips data
 horizon_numbers_forced <- as.integer(stringr::str_extract(unique(combined_data_forced$sub_horizon), "\\d+"))
@@ -327,10 +341,13 @@ for (i in 1:5) {
   file_name <- paste0("Squad Selection t-auto-forced-actual, W77-108,SHL", i, ".csv")
   temp_data <- read.csv(file_name)
   temp_data <- temp_data %>%
-    select(gameweek, actual_total_points) %>%  # Only using actual points here
+    select(gameweek, actual_total_points, alpha) %>%  # Only using actual points here
     mutate(sub_horizon = paste0("SHL", i))
   combined_data_actual_forced <- rbind(combined_data_actual_forced, temp_data)
 }
+# Hot fix
+combined_data_actual_forced <- combined_data_actual_forced|> 
+  mutate(actual_total_points = actual_total_points - alpha*transfer_penalty)
 
 # Fix sub-horizon order for actual forced gamechips data
 horizon_numbers_actual_forced <- as.integer(stringr::str_extract(unique(combined_data_actual_forced$sub_horizon), "\\d+"))
