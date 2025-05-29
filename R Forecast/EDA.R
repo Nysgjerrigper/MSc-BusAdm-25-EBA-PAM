@@ -791,3 +791,211 @@ df3 |> filter(starts == 1) |>distinct(name) |> nrow()
 df1 |> filter(minutes >= 1) |>distinct(name) |> nrow()
 df2 |> filter(minutes >= 1) |>distinct(name) |> nrow()
 df3 |> filter(minutes >= 1) |>distinct(name) |> nrow()
+
+# Formal Tests for norm and statio
+
+rm(list = ls(all = TRUE))
+
+set.seed(1)
+
+pacman::p_load(tidyverse, tseries)
+# Fetch data and prelim data manipulation ----
+df <- read_csv("C:/Users/peram/Documents/test/Datasett/Ekstra kolonner, stigende GW, alle tre sesonger(22-24), heltall.csv")
+num <- df |>
+  group_by(name,GW) |> select(name,GW,total_points, value, bps, transfers_balance)
+num <- as.data.frame(num)
+
+# Get unique player names
+unique_players <- unique(num$name)
+
+# Create an empty list to store results for each player
+player_results <- list()
+
+# Loop through each unique player
+for (player_name in unique_players) {
+  # Subset the data for the current player
+  player_data <- num[num$name == player_name, ]
+  player_data <- player_data[order(player_data$GW), ]
+  
+  n_obs <- nrow(player_data)
+  player_mean_total_points <- mean(player_data$total_points)
+  adf_p_value <- NA # Initialize p-value
+  
+  # ACF analysis removed - not needed for LSTM assumptions
+  
+  adf_result_obj <- NA # Initialize ADF result object
+  
+  if (n_obs >= 5) {
+    k_value <- min(floor((n_obs - 1) / 3), 2)
+    tryCatch({
+      adf_result_obj <- adf.test(player_data$total_points, alternative = "stationary", k = k_value)
+      adf_p_value <- adf_result_obj$p.value
+    }, error = function(e) {
+      adf_result_obj <- paste("ADF Error:", e$message)
+      adf_p_value <- NA
+    })
+  } else {
+    adf_result_obj <- "Insufficient data (< 6 observations)"
+    adf_p_value <- NA
+  }
+  
+  # Add Kolmogorov-Smirnov test for normality
+  ks_p_value <- NA
+  ks_result_obj <- NA
+  points <- player_data$total_points
+  
+  if (n_obs >= 3 && !any(is.na(points)) && length(unique(points)) >= 2 && sd(points) > 0) {
+    tryCatch({
+      ks_result_obj <- ks.test(points, "pnorm", mean(points), sd(points))
+      ks_p_value <- ks_result_obj$p.value
+    }, error = function(e) {
+      ks_result_obj <- paste("KS Error:", e$message)
+      ks_p_value <- NA
+    })
+  } else {
+    ks_result_obj <- "Insufficient data or zero variance"
+    ks_p_value <- NA
+  }
+  
+  player_results[[player_name]] <- list(
+    player_data = player_data,
+    adf_result_object = adf_result_obj,
+    adf_p_value = adf_p_value,
+    ks_result_object = ks_result_obj,
+    ks_p_value = ks_p_value,
+    mean_total_points = player_mean_total_points,
+    n_observations = n_obs
+  )
+}
+
+# To calculate the mean p-value across all players where the ADF test was run:
+valid_p_values <- unlist(lapply(player_results, function(x) x$adf_p_value))
+valid_p_values <- valid_p_values[!is.na(valid_p_values)]
+mean_adf_p_value <- mean(valid_p_values)
+cat(paste("Mean ADF p-value (for players with sufficient data):", mean_adf_p_value, "\n"))
+
+# To get a classification of reject/fail to reject based on a significance level (e.g., 0.05):
+alpha <- 0.05
+adf_classification <- lapply(player_results, function(x) {
+  if (!is.na(x$adf_p_value)) {
+    if (x$adf_p_value < alpha) {
+      return("Reject")
+    } else {
+      return("Fail to Reject")
+    }
+  } else {
+    return("Insufficient Data")
+  }
+})
+
+# You can then analyze the frequency of "Reject" and "Fail to Reject"
+table(unlist(adf_classification))
+
+# Kolmogorov-Smirnov test for normality (PERFECT for small samples 3-5!)
+ks_classification <- lapply(player_results, function(x) {
+  if (!is.na(x$ks_p_value)) {
+    if (x$ks_p_value < alpha) {
+      return("Reject Normality")  # Data is NOT normal
+    } else {
+      return("Fail to Reject Normality")  # Data appears normal
+    }
+  } else {
+    # Determine the reason for missing p-value
+    player_data <- x$player_data
+    points <- player_data$total_points
+    n_obs <- length(points)
+    
+    if (n_obs < 3) {
+      return("Insufficient Data")
+    } else if (any(is.na(points))) {
+      return("Contains NA")
+    } else if (length(unique(points)) < 2 || sd(points) == 0) {
+      return("Zero Variance")
+    } else {
+      return("Test Error")
+    }
+  }
+})
+
+# Create summary table for KS results
+ks_table <- table(unlist(ks_classification))
+print("Kolmogorov-Smirnov Test Results:")
+print(ks_table)
+
+# Calculate mean p-value for KS tests (where available)
+valid_ks_p <- unlist(lapply(player_results, function(x) x$ks_p_value))
+valid_ks_p <- valid_ks_p[!is.na(valid_ks_p)]
+mean_ks_p_value <- ifelse(length(valid_ks_p) > 0, mean(valid_ks_p), NA)
+
+if (!is.na(mean_ks_p_value)) {
+  cat(paste("Mean Kolmogorov-Smirnov p-value:", round(mean_ks_p_value, 4), "\n"))
+}
+
+# Create data frames for plotting
+# Convert the ADF classification results to a data frame for ggplot
+classification_df <- data.frame(
+  Classification = names(table(unlist(adf_classification))),
+  Count = as.numeric(table(unlist(adf_classification)))
+)
+classification_df$Percentage <- round(classification_df$Count / sum(classification_df$Count) * 100, 1)
+
+# Convert KS results to data frame for ggplot
+ks_df <- data.frame(
+  Classification = names(ks_table),
+  Count = as.numeric(ks_table)
+)
+ks_df$Percentage <- round(ks_df$Count / sum(ks_df$Count) * 100, 1)
+
+# Load patchwork for combining plots
+library(patchwork)  # You might need to install this: install.packages("patchwork")
+
+# Create ADF plot
+adf_plot <- ggplot(classification_df, aes(x = Classification, y = Count, fill = Classification)) +
+  geom_col(alpha = 0.8, color = "black", size = 0.5) +
+  geom_text(aes(label = paste0(Count, "\n(", Percentage, "%)")), 
+            vjust = -0.5, size = 3.5) +
+  scale_fill_manual(values = c("Insufficient Data" = "#999999", 
+                               "Fail to Reject" = "#2E8B57", 
+                               "Reject" = "#DC143C"),
+                    guide = "none") +
+  labs(title = "ADF Stationarity Test",
+       subtitle = paste("Total players analyzed:", sum(classification_df$Count)),
+       x = "Stationarity Decision (Alpha = 0.05)",
+       y = "Number of Players") +
+  theme_gray() +
+  ylim(0, max(classification_df$Count) * 1.15) +
+  theme(plot.title = element_text(hjust = 0.5, size = 12, face = "bold"),
+        plot.subtitle = element_text(hjust = 0.5, size = 10),
+        axis.text.x = element_text(angle = 45, hjust = 1))
+
+# Create KS plot
+ks_plot <- ggplot(ks_df, aes(x = Classification, y = Count, fill = Classification)) +
+  geom_col(alpha = 0.8, color = "black", size = 0.5) +
+  geom_text(aes(label = paste0(Count, "\n(", Percentage, "%)")), 
+            vjust = -0.5, size = 3.5) +
+  scale_fill_manual(values = c("Fail to Reject Normality" = "#2E8B57",     # Green
+                               "Reject Normality" = "#DC143C",             # Red  
+                               "Insufficient Data" = "#999999",            # Gray
+                               "Contains NA" = "#FFA500",                   # Orange
+                               "Zero Variance" = "#FF1493",                # Hot Pink
+                               "Test Error" = "#800080"),                   # Purple
+                    guide = "none") +
+  labs(title = "Kolmogorov-Smirnov Normality Test",
+       subtitle = ifelse(!is.na(mean_ks_p_value), 
+                         paste("Total players analyzed:", sum(ks_df$Count), 
+                               "| Mean p-value:", round(mean_ks_p_value, 4)),
+                         paste("Total players analyzed:", sum(ks_df$Count))),
+       x = "Normality Decision (Alpha = 0.05)",
+       y = "Number of Players")
+
+# Combine both plots (SINGLE TIME ONLY)
+combined_plot <- adf_plot + ks_plot + 
+  plot_annotation(title = "Formal Tests Results",
+                  theme = theme(plot.title = element_text(hjust = 0.5, size = 16, face = "bold")))
+
+print(combined_plot)
+
+# Save the combined plot
+ggsave("Formal_Stationarity_and_Normality_Results.png", 
+       plot = combined_plot, 
+       width = 24, height = 12, dpi = 300)
