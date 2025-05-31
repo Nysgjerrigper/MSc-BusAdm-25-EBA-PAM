@@ -1,11 +1,4 @@
 # Forecasts for FPL Script to Master thesis EBA&PAM
-# To load save weights ----
-# Kaggle Export: The .hdf5 weight files saved in /kaggle/working/ will appear in the "Output" section of your Kaggle notebook session after it completes. You can download them from there.
-# Loading Later: Remember, when you want to use these weights later (in another notebook or locally), you MUST:
-# Rebuild the exact same model architecture using keras_model().
-# Compile the model using the exact same optimizer, loss, and metrics.
-# Load the weights using load_model_weights_hdf5().
-# Load the corresponding scaling factors (mu, sigma, numF) to prepare input data and unscale predictions.
 
 rm(list = ls(all = TRUE))
 
@@ -21,15 +14,15 @@ pacman::p_load(ggthemes, tidyverse, slider,
                glmnet,httr,jsonlite,tensorflow,
                Metrics, pastecs, stats, png, grid)
 
-set.seed(1)  # Set R's random seed :/
-tensorflow::set_random_seed(1) # Doesnt work :/
+set.seed(1)  
+tensorflow::set_random_seed(1)
 
 # Lists to store results ----
 model_list       <- list()
 scaling_factors  <- list()
 predictions_list <- list()
-metrics_list     <- list() # User's original list
-validation_metrics <- list() # For storing evaluation results
+metrics_list     <- list() 
+validation_metrics <- list() 
 
 # Global user inputs ----
 split_gw <- 38+38
@@ -40,7 +33,6 @@ num_patience <- round(epoker*0.5)
 
 # Fetch data and prelim data manipulation ----
 df <- read_csv("C:/Users/peram/Documents/test/Datasett/Ekstra kolonner, stigende GW, alle tre sesonger(22-24), heltall.csv")
-alternativsammensatt <- df
 
 ## Positions Partitions ----
 gk <- df %>%
@@ -95,10 +87,7 @@ numF <- c(
 tar <- "total_points"
 initial_numF_gk <- length(numF)
 
-gk <- gk %>%
-  arrange(pID_idx, GW) %>%
-  group_by(pID_idx) %>%
-  ungroup()
+gk <- gk |> arrange(pID_idx, GW)
 
 mu <- mean(gk[[tar]], na.rm = TRUE)
 sigma <- sd(gk[[tar]], na.rm = TRUE)
@@ -133,7 +122,7 @@ numF_gk <- keepF
 numF <- keepF # Update numF globally for this position block
 
 ## GK 1.4.1: Rebuild Numeric Windows ----
-ws <- vindu # Reset ws just in case, though it's global
+ws <- vindu
 numW <- gk %>%
   group_by(pID_idx) %>%
   filter(n() > ws) %>%
@@ -268,9 +257,8 @@ preds_gk_clean <- preds_gk %>%
 
 ## GK 1.11: Plots for Evaluation ----
 history_gk <- history
-history_df_gk <- data.frame(history_gk)
 plot_history_gk <- plot(history_gk)
-print(plot_history_gk) # Explicitly print
+print(plot_history_gk)
 
 plot_actual_predicted_gk <- ggplot(preds_gk, aes(x=actual_total_points, y=predicted_total_points)) +
   geom_point(alpha=0.5) +
@@ -316,10 +304,7 @@ numF <- c("goals_scored","assists", "creativity", "minutes", "goals_conceded",
 tar <- "total_points"
 initial_numF_def <- length(numF)
 
-def <- def %>%
-  arrange(pID_idx, GW) %>%
-  group_by(pID_idx) %>%
-  ungroup()
+def <- def |> arrange(pID_idx, GW)
 
 mu <- mean(def[[tar]], na.rm=T)
 sigma <- sd(def[[tar]], na.rm=T)
@@ -488,7 +473,6 @@ preds_def_clean<-preds_def%>%select(row_id,GW,player_id,name,position,team,actua
 
 ## DEF 2.11: Plots for Evaluation ----
 history_def<-history
-history_df_def<-data.frame(history_def)
 plot_history_def<-plot(history_def)
 print(plot_history_def)
 
@@ -535,12 +519,10 @@ numF <- c("goals_scored","assists", "creativity", "minutes", "goals_conceded",
           "selected", "transfers_balance", "starts", "influence",
           "clean_sheets")
 tar <- "total_points"
-initial_numF_mid <- length(numF) # Corrected
+initial_numF_mid <- length(numF)
 
-mid <- mid %>%
-  arrange(pID_idx, GW) %>%
-  group_by(pID_idx) %>%
-  ungroup()
+mid <- mid |> arrange(pID_idx, GW) %>%
+
 
 mu <- mean(mid[[tar]], na.rm=T)
 sigma <- sd(mid[[tar]], na.rm=T)
@@ -709,7 +691,6 @@ preds_mid_clean<-preds_mid%>%select(row_id,GW,player_id,name,position,team,actua
 
 ## MID 3.11: Plots for Evaluation ----
 history_mid<-history
-history_df_mid<-data.frame(history_mid)
 plot_history_mid<-plot(history_mid)
 print(plot_history_mid)
 
@@ -757,12 +738,9 @@ numF <- c("goals_scored","assists", "creativity", "minutes", "goals_conceded",
           "selected", "transfers_balance", "starts", "influence",
           "clean_sheets")
 tar <- "total_points"
-initial_numF_fwd <- length(numF) # Corrected
+initial_numF_fwd <- length(numF) 
 
-fwd <- fwd %>%
-  arrange(pID_idx, GW) %>%
-  group_by(pID_idx) %>%
-  ungroup()
+fwd <- fwd |> arrange(pID_idx, GW)
 
 mu <- mean(fwd[[tar]], na.rm=T)
 sigma <- sd(fwd[[tar]], na.rm=T)
@@ -931,7 +909,6 @@ preds_fwd_clean<-preds_fwd%>%select(row_id,GW,player_id,name,position,team,actua
 
 ## FWD 4.11: Plots for Evaluation ----
 history_fwd<-history
-history_df_fwd<-data.frame(history_fwd)
 plot_history_fwd<-plot(history_fwd)
 print(plot_history_fwd)
 

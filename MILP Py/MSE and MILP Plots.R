@@ -1,5 +1,5 @@
 rm(list = ls(all = TRUE))
-# Load required libraries
+# packs
 library(tidyverse)
 library(xtable)
 
@@ -22,16 +22,15 @@ res <- df |>
   mutate(ressqr = residuals^2)
 
 # Create a residuals distribution plot by position
-# First, ensure residuals are calculated
 res <- res |> 
   mutate(residuals = actual_total_points - predicted_total_points) |> 
   mutate(ressqr = residuals^2)
 
-# Ensure position is ordered the same way as in EDA
+# position enforce
 res <- res |> 
   mutate(position = factor(position, levels = c("GK", "DEF", "MID", "FWD")))
 
-# Create density plots faceted by position with matching color scheme
+# Dens plots
 position_residuals_plot <- ggplot(res, aes(x = residuals, fill = position, color = position)) +
   geom_density(alpha = 0.2) +  # Changed to 0.2 to match EDA
   facet_wrap(~ position) +
@@ -44,7 +43,6 @@ position_residuals_plot <- ggplot(res, aes(x = residuals, fill = position, color
   geom_vline(xintercept = 0, linetype = "dashed", color = "red") +
   theme(legend.position = "bottom")
 
-# Display the plot
 print(position_residuals_plot)
 
 # Save the plot to the output directory
@@ -52,12 +50,12 @@ ggsave(file.path(output_dir, "position_residuals_distribution.png"),
        plot = position_residuals_plot, 
        width = 10, height = 8)
 
-# Calculate MSE and RMSE by position - UPDATED to include mean residuals
+# Calculate MSE and RMSE by position
 mse_rmse_by_position <- res |> 
   group_by(position) |> 
   summarize(
     n = n(),
-    mean_residual = mean(residuals),  # Add mean of raw residuals
+    mean_residual = mean(residuals),  
     mse = mean(ressqr),
     rmse = sqrt(mean(ressqr)),
     mean_actual = mean(actual_total_points),
@@ -65,12 +63,12 @@ mse_rmse_by_position <- res |>
   ) |>
   ungroup()
 
-# Calculate overall MSE and RMSE - UPDATED to include mean residuals
+# Calculate overall MSE and RMSE
 overall_mse_rmse <- res |> 
   summarize(
     position = "ALL",
     n = n(),
-    mean_residual = mean(residuals),  # Add mean of raw residuals
+    mean_residual = mean(residuals),  
     mse = mean(ressqr),
     rmse = sqrt(mean(ressqr)),
     mean_actual = mean(actual_total_points),
@@ -81,10 +79,10 @@ overall_mse_rmse <- res |>
 all_metrics <- bind_rows(mse_rmse_by_position, overall_mse_rmse) |>
   arrange(position != "ALL", mse)
 
-# Print the results
+# display
 print(all_metrics)
 
-# Create a formatted table
+# ovrlf table
 metrics_table <- xtable::xtable(
   all_metrics,
   caption = "Post Training Metrics by Player Position",
@@ -99,10 +97,10 @@ capture.output(
 )
 
 # Forecasted ----
-# Set working directory (adjust path as needed)
+
 setwd("C:/Users/peram/Documents/test/MILP Py")
 
-# Initialize an empty data frame to store combined data
+# init frame
 combined_data_lstm <- data.frame()
 
 # Loop through the n files
@@ -115,14 +113,13 @@ for (i in 1:10) {
   combined_data_lstm <- rbind(combined_data_lstm, temp_data)
 }
 
-# FIX actual_total_points to be net
+# FIX actual_total_points to be net pints
 colnames(combined_data_lstm)
 transfer_penalty <- 4
 combined_data_lstm <- combined_data_lstm |> 
   mutate(actual_total_points = actual_total_points - alpha*transfer_penalty)
 
-# --- FIX SUB-HORIZON ORDER FOR LSTM ---
-# Extract numeric part and order
+# Set Sub-horisnt order
 horizon_numbers_lstm <- as.integer(stringr::str_extract(unique(combined_data_lstm$sub_horizon), "\\d+"))
 ordered_levels_lstm <- paste0("SHL", sort(horizon_numbers_lstm))
 
@@ -130,7 +127,7 @@ combined_data_lstm <- combined_data_lstm %>%
   mutate(sub_horizon = factor(sub_horizon, levels = ordered_levels_lstm))
 
 
-# Reshape data to long format for ggplot
+# Reshape for ggplot
 plot_data_lstm <- combined_data_lstm %>%
   pivot_longer(cols = c(objective_gw, actual_total_points),
                names_to = "line_type",
@@ -139,7 +136,7 @@ plot_data_lstm <- combined_data_lstm %>%
                             "objective_gw" = "Forecasted Squad Points",
                             "actual_total_points" = "Actual Squad Points"))  # FIXED: actual_lineup_points to actual_total_points
 
-# Create the original line plot - fixed syntax error with line_type
+# Create the original line plot 
 p1_lstm <- ggplot(plot_data_lstm, aes(x = gameweek, y = points, color = sub_horizon, linetype = line_type)) +
   geom_line(linewidth = 0.8) +
   labs(title = "Gameweek Points by Sub-Horizon, Squads from forecasts with actual squad points",
@@ -152,7 +149,7 @@ p1_lstm <- ggplot(plot_data_lstm, aes(x = gameweek, y = points, color = sub_hori
 print(p1_lstm)
 ggsave(file.path(output_dir, "fantasy_points_plot_lstm.png"), plot = p1_lstm, width = 10, height = 6) # Increased width for legend
 
-# --- CUMULATIVE PLOT FOR LSTM DATA ---
+# CUMULATIVE PLOT FOR LSTM DATA ----
 cumulative_plot_data_lstm <- combined_data_lstm %>%
   group_by(sub_horizon) %>%
   arrange(gameweek) %>%
@@ -187,7 +184,7 @@ p_cumulative_lstm <- ggplot(cumulative_plot_data_lstm_long,
 print(p_cumulative_lstm)
 ggsave(file.path(output_dir, "cumulative_fantasy_points_plot_lstm.png"), plot = p_cumulative_lstm, width = 10, height = 6)
 
-# Extract end values for LSTM - include both metrics
+# Extract end values for LSTM 
 end_values_lstm <- cumulative_plot_data_lstm %>%
   group_by(sub_horizon) %>%
   filter(gameweek == max(gameweek)) %>%
@@ -204,7 +201,7 @@ end_values_lstm_x <- print(xtable::xtable(end_values_lstm))
 
 
 # Actual ----
-#setwd("C:/Users/peram/Documents/test/MILP Py")
+
 combined_data_actual <- data.frame()
 
 # Loop through the n files
@@ -249,7 +246,7 @@ print(p1_actual)
 ggsave(file.path(output_dir, "fantasy_points_plot_actual.png"), plot = p1_actual, width = 10, height = 6)
 
 
-# --- CUMULATIVE PLOT FOR ACTUAL DATA ---
+#  CUMULATIVE PLOT FOR ACTUAL DATA ----
 cumulative_plot_data_actual <- combined_data_actual %>% # Use already factor-ordered combined_data_actual
   group_by(sub_horizon) %>%
   arrange(gameweek) %>%
@@ -293,7 +290,7 @@ combined_data_forced <- combined_data_forced |>
   mutate(actual_total_points = actual_total_points - alpha*transfer_penalty)
 
 
-# Fix sub-horizon order for forced gamechips data
+# Set sub-horizon order for forced gamechips data
 horizon_numbers_forced <- as.integer(stringr::str_extract(unique(combined_data_forced$sub_horizon), "\\d+"))
 ordered_levels_forced <- paste0("SHL", sort(horizon_numbers_forced))
 
@@ -462,7 +459,7 @@ comprehensive_xtable <- xtable::xtable(
   digits = c(0, 0, 0, 0, 0, 0)  # Format decimal places
 )
 
-# Save as a single text file with proper formatting
+# Save as a single text file w
 capture.output(
   print(comprehensive_xtable, 
         include.rownames = FALSE,
@@ -470,7 +467,7 @@ capture.output(
   file = file.path(output_dir, "comprehensive_model_comparison.txt")
 )
 
-# Create a separate well-formatted table for the residual analysis - UPDATED for new column
+# Export table
 residual_xtable <- xtable(
   all_metrics, 
   caption = "Prediction Error Metrics by Position",
@@ -483,4 +480,4 @@ capture.output(
         include.rownames = FALSE,
         caption.placement = "bottom"), 
   file = file.path(output_dir, "detailed_residual_analysis.txt")
-)
+  )

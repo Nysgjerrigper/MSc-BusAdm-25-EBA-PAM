@@ -4,57 +4,36 @@ import numpy as np
 import time
 import sys
 import os
-import math # Used for rounding FT
+import math 
 
-# Dette skriptet er forskjellig fra MILP-GC 
-# Dette skriptet vil også returnere faktisk poeng for laget i csv-en sin
-# Samt den har mulighet til å legge inn eget nåværende lag
+# This script allows for forced GC, set squad and returns squads actual total points
 
 # --- Input Parameters ---
-CSV_FILE_PATH = "C:/Users/peram/Documents/test/Datasett/Validation_Predictions_Clean (2).csv" # <<< POINT TO RAW, NON-AGGREGATED FILE
+CSV_FILE_PATH = "C:/Users/peram/Documents/test/Validation_Predictions_Clean_v2.csv" 
 
-START_GAMEWEEK = 80 # Example: Start of the 3rd season (1+38+38)
-MAX_GAMEWEEK = 81 # Example: Run for a few GWs for testing
+START_GAMEWEEK = 80 # Where to start? 1 Seasons = 38 GW
+MAX_GAMEWEEK = 107 # Where to stop? 
 SUB_HORIZON_LENGTH = 1 # Look ahead N weeks
-# --- SET TIMELIMIT HERE ---
-SOLVER_TIME_LIMIT = None  # Seconds (e.g., 600 for 10 mins) or None for no limit
-# PROGRESS_UPDATE_INTERVAL = 60 # Removed
+SOLVER_TIME_LIMIT = None  # Set solver limit.
 
 # ---  Gamechip manual usage or None ---- 
 SEASON_START_GW = START_GAMEWEEK
-TARGET_GW_WC1_OPPORTUNITY = None#SEASON_START_GW + 1
-TARGET_GW_TC = None#SEASON_START_GW + 2 
-TARGET_GW_FH = None#SEASON_START_GW + 3 
-TARGET_GW_WC2_OPPORTUNITY = None#SEASON_START_GW + 4 
-TARGET_GW_BB = None#SEASON_START_GW + 5 
+TARGET_GW_WC1_OPPORTUNITY = None #SEASON_START_GW + 1
+TARGET_GW_TC = None #SEASON_START_GW + 2 
+TARGET_GW_FH = None #SEASON_START_GW + 3 
+TARGET_GW_WC2_OPPORTUNITY = None #SEASON_START_GW + 4 
+TARGET_GW_BB = None #SEASON_START_GW + 5 
 print(f"Chip Opportunity GWs (Absolute): WC1={TARGET_GW_WC1_OPPORTUNITY}, TC={TARGET_GW_TC}, FH={TARGET_GW_FH}, WC2={TARGET_GW_WC2_OPPORTUNITY}, BB={TARGET_GW_BB}")
 
 # --- Initial Team Configuration ---
 USE_INITIAL_TEAM = False  # Set to False to start from scratch
 USE_NAMES_NOT_IDS = True  # Set to True to use names instead of IDs
 
-# Specify your team using names
-INITIAL_TEAM_NAMES = [ 
-                    "Bernd Leno", 
-                    "Dan Burn",
-                    "Emiliano Martinez Romero",
-                    "Erling Haaland",
-                    "Ezri Konsa Ngoyo",
-                    "Fabian Schar", 
-                    "Julian Alvarez",
-                    "Mohamed Salah",
-                    "Mohammed Kudus",
-                    "Ollie Watkins",
-                    "Pascal Gross",
-                    "Phil Foden",
-                    "Son Heung-min",
-                    "Trent Alexander-Arnold",
-                    "Virgil van Dijk"
-]
-
+# Specify squad using names
+INITIAL_TEAM_NAMES = []
 INITIAL_TEAM_IDS = []  # Leave empty, will be filled from names if USE_NAMES_NOT_IDS=True
-INITIAL_BUDGET = 23.0  # Your remaining budget
-INITIAL_FT = 1         # Available free transfers
+INITIAL_BUDGET = None # FPL remaining budget
+INITIAL_FT = None         # Available free transfers
 
 # --- Configure Solver (Default Threads) ---
 solver_to_use = pulp.PULP_CBC_CMD(
@@ -88,7 +67,7 @@ print("Initial raw data shape:", allesesonger.shape)
 
 # --- Data Pre-processing and Filtering ---
 print("\n--- Pre-processing Raw Data ---")
-essential_input_cols = ['player_id', 'GW', 'name', 'position', 'team', 'predicted_total_points', 'value'] # Adjusted
+essential_input_cols = ['player_id', 'GW', 'name', 'position', 'team', 'predicted_total_points', 'value']
 missing_cols = [col for col in essential_input_cols if col not in allesesonger.columns]
 if missing_cols:
     print(f"ERROR: Missing essential columns in the raw CSV: {missing_cols}")
@@ -98,15 +77,11 @@ if missing_cols:
 try:
     allesesonger['GW'] = pd.to_numeric(allesesonger['GW'])
     allesesonger['value'] = pd.to_numeric(allesesonger['value'])
-    allesesonger['value'] = allesesonger['value'].fillna(50.0) # Fill NA before potential scaling
-    # --- SCALING --- Uncomment if your value needs scaling
-    # allesesonger['value'] = allesesonger['value'] * 10
-    # print("Value scaled by 10")
+    allesesonger['value'] = allesesonger['value'].fillna(50.0)
 except ValueError as e:
     print(f"ERROR: Could not convert 'GW' or 'value' column to numeric: {e}")
     sys.exit()
 
-# Add after line 73 (after filling NA values)
 # --- DOUBLE GAMEWEEK HANDLING ---
 print("Checking for double gameweeks and resolving...")
 try:
@@ -200,7 +175,7 @@ data_merged_full['predicted_total_points'] = data_merged_full['predicted_total_p
 data_merged_full['value'] = data_merged_full.groupby('player_id')['value'].transform(lambda x: x.ffill().bfill())
 data_merged_full['value'] = data_merged_full['value'].fillna(50.0)
 
-# --- AGGREGATION FOR DGWs --- # <<<< THIS BLOCK IS KEPT
+# --- AGGREGATION FOR DGWs ---
 print("Aggregating data for Double Gameweeks...")
 sum_cols = ['predicted_total_points', 'minutes', 'goals_scored', 'assists', 'bonus', 'bps', 'saves', 'penalties_saved'] # Add/remove as needed
 first_cols = ['value', 'name', 'position', 'team']
@@ -214,7 +189,7 @@ data_aggregated = data_merged_full.groupby(group_cols, as_index=False).agg(agg_f
 print(f"Data shape after aggregation: {data_aggregated.shape}")
 
 # --- Post-Aggregation Cleaning & Filtering ---
-data_cleaned_full = data_aggregated.copy() # <<<< USE AGGREGATED DATA
+data_cleaned_full = data_aggregated.copy() 
 print("Filtering invalid rows post-aggregation...")
 initial_rows_agg = data_cleaned_full.shape[0]
 data_cleaned_full = data_cleaned_full.dropna(subset=essential_info_cols).copy()
@@ -229,7 +204,7 @@ print(f"Cleaned aggregated data shape: {data_cleaned_full.shape}")
 # --- Define FINAL FULL Sets and Parameters (using data_cleaned_full) ---
 print("Defining final sets and parameters...")
 # --- Re-check START_GAMEWEEK against the actual cleaned data ---
-T_setofgameweeks_full = sorted(data_cleaned_full['GW'].unique()) # Update based on cleaned data
+T_setofgameweeks_full = sorted(data_cleaned_full['GW'].unique()) 
 if START_GAMEWEEK not in T_setofgameweeks_full:
      available_gws_after_start = [gw for gw in T_setofgameweeks_full if gw >= START_GAMEWEEK]
      if not available_gws_after_start: print(f"ERROR: START_GAMEWEEK {START_GAMEWEEK} not in cleaned data range ({min(T_setofgameweeks_full)}-{max(T_setofgameweeks_full)})."); sys.exit()
@@ -273,7 +248,6 @@ M_transfer = MK + MD + MM + MF
 M_budget = BS + M_transfer * 200
 M_alpha = M_transfer + Q_bar
 M_q = Q_bar + 1
-epsilon_q = 0.1
 print("Parameters defined.")
 
 # Prepare Coefficient Data Structures
@@ -291,7 +265,7 @@ try:
     print("Full coefficient matrices ready.")
 except Exception as e: print(f"ERROR creating full pivot tables: {e}"); sys.exit()
 
-# Add after loading your data and creating the player info dataframes
+# Add after loading data and creating the player info dataframes
 if USE_INITIAL_TEAM and USE_NAMES_NOT_IDS:
     # Create a name-to-ID mapping
     name_to_id_map = final_player_info.set_index('name')['player_id'].to_dict()
@@ -380,7 +354,6 @@ for current_gw in range(START_GAMEWEEK, MAX_GAMEWEEK + 1):
 
     # --- Gamechips (with Timing Restrictions) ---
     print("  Adding Gamechip constraints (with timing)...")
-    # <<< This block correctly implements chip timing >>>
     wc1_available = not used_chips_tracker['wc1']
     wc2_available = not used_chips_tracker['wc2']
     tc_available = not used_chips_tracker['tc']
@@ -416,7 +389,6 @@ for current_gw in range(START_GAMEWEEK, MAX_GAMEWEEK + 1):
 
     # --- Squad, FH Squad, Lineup, Captain, Subs (Iterate over t_sub) ---
     print("  Adding Squad, Lineup, Captain, Sub constraints...")
-    # ... (These constraints remain the same - Correct) ...
     squad_size_total = MK + MD + MM + MF
     for t_ in t_sub:
         # Regular Squad (4.8 - 4.12)
@@ -748,8 +720,6 @@ else:
         if col in results_df_named.columns:
             results_df_named[col] = results_df_named[col].apply(map_ids_to_names)
     print("ID to Name conversion complete.")
-
-    # Add this after the line "results_df_named = results_df.copy()" in the final results processing section
 
     # Calculate actual points if available in the source data
     if 'actual_total_points' in data_full_range_raw.columns:

@@ -4,8 +4,8 @@ import numpy as np
 import time
 import sys
 import os
-import math # Used for rounding FT
-import argparse # Add this import
+import math 
+import argparse 
 
 # Dette skriptet er forskjellig fra t ved at den bruker .bat filen
 # Denne filen har ikke valgfritt starter lag

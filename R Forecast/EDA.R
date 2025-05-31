@@ -1,10 +1,11 @@
 # EDA ----
-# Analysis of point distributions for players based on different criteria
+
 rm(list = ls(all = TRUE))
-# Load required packages for statistical description
+
+# Packs
 if (!require("pacman")) install.packages("pacman")
 pacman::p_load(pastecs,tidyverse,ggridges, xtable, moments,
-qqplotr)
+qqplotr, patchwork)
 
 # Create directory for saving plots
 setwd("C:/Users/peram/Documents/test")
@@ -773,7 +774,8 @@ print(position_stats_all_22_23)
 print(position_stats_all_23_24)
 print(position_stats_all_24_25)
 
-# After thought
+#Count of players
+
 df1 <- season_22_23
 df2 <- season_23_24
 df3 <- season_24_25
@@ -793,10 +795,7 @@ df2 |> filter(minutes >= 1) |>distinct(name) |> nrow()
 df3 |> filter(minutes >= 1) |>distinct(name) |> nrow()
 
 # Formal Tests for norm and statio
-
-rm(list = ls(all = TRUE))
-
-set.seed(1)
+set.seed(1)<
 
 pacman::p_load(tidyverse, tseries)
 # Fetch data and prelim data manipulation ----
@@ -819,10 +818,7 @@ for (player_name in unique_players) {
   
   n_obs <- nrow(player_data)
   player_mean_total_points <- mean(player_data$total_points)
-  adf_p_value <- NA # Initialize p-value
-  
-  # ACF analysis removed - not needed for LSTM assumptions
-  
+  adf_p_value <- NA # Initialize p-value  
   adf_result_obj <- NA # Initialize ADF result object
   
   if (n_obs >= 5) {
@@ -874,7 +870,7 @@ valid_p_values <- valid_p_values[!is.na(valid_p_values)]
 mean_adf_p_value <- mean(valid_p_values)
 cat(paste("Mean ADF p-value (for players with sufficient data):", mean_adf_p_value, "\n"))
 
-# To get a classification of reject/fail to reject based on a significance level (e.g., 0.05):
+# To get a classification of reject/fail to reject based on a significance level:
 alpha <- 0.05
 adf_classification <- lapply(player_results, function(x) {
   if (!is.na(x$adf_p_value)) {
@@ -888,16 +884,16 @@ adf_classification <- lapply(player_results, function(x) {
   }
 })
 
-# You can then analyze the frequency of "Reject" and "Fail to Reject"
+# Frequency of "Reject" and "Fail to Reject"
 table(unlist(adf_classification))
 
-# Kolmogorov-Smirnov test for normality (PERFECT for small samples 3-5!)
+# Kolmogorov-Smirnov test for normality
 ks_classification <- lapply(player_results, function(x) {
   if (!is.na(x$ks_p_value)) {
     if (x$ks_p_value < alpha) {
       return("Reject Normality")  # Data is NOT normal
     } else {
-      return("Fail to Reject Normality")  # Data appears normal
+      return("Fail to Reject Normality")  # Normal
     }
   } else {
     # Determine the reason for missing p-value
@@ -945,9 +941,6 @@ ks_df <- data.frame(
   Count = as.numeric(ks_table)
 )
 ks_df$Percentage <- round(ks_df$Count / sum(ks_df$Count) * 100, 1)
-
-# Load patchwork for combining plots
-library(patchwork)  # You might need to install this: install.packages("patchwork")
 
 # Create ADF plot
 adf_plot <- ggplot(classification_df, aes(x = Classification, y = Count, fill = Classification)) +
