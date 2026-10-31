@@ -1,0 +1,20 @@
+Original MSc research repository: MSc-BusAdm-25-EBA-PAM
+
+Original material: Per Anders Molberg, to the extent owned/licensable.
+Root terms: LICENSE (Noncommercial Source License 1.1, with additional
+AI-training conditions on model openness and European organizational control).
+Released learned model artifacts: LICENSE-WEIGHTS (MIT, limited to the learned
+parameters/state described in LICENSE; executable code is not included).
+
+Third-party material is excluded from these grants and retains its own terms.
+The README identifies datasets obtained from Vaastav's FPL repository and
+MILP scripts copied or adapted from Kristiansen et al. Their original portions,
+and other external code, data, images or content, are not relicensed here.
+Original modifications are covered only to the extent Per Anders owns or can
+license them. These notices do not establish that third-party permissions have
+been obtained, or grant rights to Premier League/FPL or player/club content.
+
+Prediction CSVs, charts, architecture images, hyperparameters and datasets are
+not made into MIT-licensed learned weights merely by their format or location.
+Any separately licensed learned artifact must be identified by its contents.
+See docs/LICENSING.md for scope and examples.
