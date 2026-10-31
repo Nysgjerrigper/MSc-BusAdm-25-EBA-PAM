@@ -1,0 +1,192 @@
+Per Anders Molberg Noncommercial Source License 1.1
+SPDX-License-Identifier: LicenseRef-PAM-Noncommercial-European-Open-AI-1.1
+
+Copyright (c) 2026 Per Anders Molberg, to the extent applicable rights exist
+and are owned by, or available for licensing by, Per Anders Molberg.
+
+1. Licensor and scope
+
+The Licensor is Per Anders Molberg. "Covered Material" means the original code,
+documentation, tests, notebooks, project configuration and other original project
+material that the Licensor makes available under these terms, including original
+material developed with assistants or language models to the extent the Licensor
+owns or can license the applicable rights. These terms do not assert ownership
+of material or rights that the Licensor does not own or control.
+
+The following are excluded from Covered Material:
+(a) learned model artifacts covered by LICENSE-WEIGHTS, as defined below;
+(b) third-party code, content, dependencies, datasets and assets, including
+    upstream portions of vendored components, which retain their own terms;
+(c) material explicitly supplied under another license or agreement.
+
+A filename, directory location, or binary format alone does not determine which
+license applies. See NOTICE and docs/LICENSING.md for component boundaries.
+
+2. Free noncommercial permission
+
+Subject to these terms, the Licensor grants everyone a worldwide, nonexclusive,
+royalty-free copyright license to use, inspect, run, copy, modify and redistribute
+Covered Material, including modified versions, solely for noncommercial purposes.
+This includes personal study, hobby use, and genuinely noncommercial research,
+education and community projects. Ordinary noncommercial use is available
+worldwide. AI Training Use is subject to the additional conditions in section 9,
+which prevail over this permission. Noncommercial redistribution must be free of
+charge, preserve this license and applicable copyright and attribution notices,
+and identify modifications without implying endorsement by the Licensor.
+
+Recipients receive permission directly from the Licensor under these terms.
+You may not grant broader rights to the Licensor's Covered Material, remove its
+restrictions, or present it as available under a permissive commercial license.
+Modifications and inclusion in another project do not remove these conditions
+from the Covered Material contained in that modified or combined work.
+
+3. Commercial use requires a separate agreement
+
+Without a separate written commercial license agreement with the Licensor,
+you may not use Covered Material for commercial purposes, sell or resell it,
+or charge money for access to it or for a product or service that uses it.
+
+"Commercial purposes" includes use directed toward commercial advantage,
+revenue or business operations, including internal business use; commercial
+research or development; incorporation into paid products or services; paid
+hosting, subscriptions, consulting or support using Covered Material; resale;
+and monetization through advertising or other required consideration. Charging
+only to recover costs does not create an exception. An organization's legal
+form, tax status or educational purpose does not by itself make a use
+noncommercial. Voluntary donations that are not required for access or services
+and do not support a commercial use do not alone make a use commercial.
+
+Commercial permission must come from the Licensor, not merely from a distributor
+or contributor who lacks authority to grant it. The agreement may be free of
+charge; these terms impose no minimum fee or royalty. Requests may be directed
+to Per Anders Molberg through the project's GitHub account, Nysgjerrigper.
+
+4. Learned-model exception
+
+Learned model parameters, trained weights, fitted numerical coefficients,
+learned trees and other learned model state that the Licensor releases as
+trained artifacts are available under the MIT license in LICENSE-WEIGHTS,
+including for commercial use. This includes non-executable metadata necessary
+to load and interpret those learned artifacts. Using those artifacts independently does not require a commercial agreement
+with the Licensor. This permission does not extend to Covered Material bundled
+with an artifact: architecture or runtime source, custom executable classes,
+training/inference scripts, feature engineering, optimization code, or project
+configuration remain subject to their own licenses. Serialization does not
+convert embedded executable project code into unrestricted model weights.
+
+Training hyperparameters, tuning-study configuration and trial histories are
+project configuration, not learned weights. Third-party models or data cannot
+be relicensed by this exception. Artifact recipients must retain the applicable
+MIT notice and any separate third-party notices.
+
+5. Rights reserved and independent rights
+
+The Licensor retains ownership and may use, commercialize, sell or separately
+license their own material without being restricted by this license. No
+ownership assignment is required from a recipient. These terms do not give the
+Licensor ownership of another person's independent contributions or grant
+commercial relicensing rights over them without that person's authorization.
+They do not restrict independently created material, ideas, facts, or rights
+already granted by applicable law or a separate license. No trademark or
+endorsement rights are granted. Rights not expressly granted are reserved.
+
+6. Compliance and termination
+
+Permissions under these terms end if you violate their conditions. Continued
+commercial use then requires the Licensor's written agreement; obtaining a
+copy from someone else does not restore permission. A separate agreement may
+provide different remedies or restore permission. Mandatory rights under
+applicable law are unaffected.
+
+7. No warranty or liability
+
+To the extent permitted by applicable law, Covered Material is provided "AS IS",
+without warranties, including merchantability, fitness for a particular purpose,
+noninfringement, accuracy, availability or fitness for financial decisions.
+To that same extent the Licensor is not liable for claims, damages or other
+liability arising from the material or its use. Nothing excludes liability
+that applicable law prohibits excluding.
+
+8. Character of these terms
+
+This is a custom source-available, noncommercial license. It is not an
+OSI-approved open-source license and must not be described as one. The separate
+MIT license for learned artifacts does not make the entire project permissively
+licensed. A separate written agreement controls where it expressly differs
+from these terms.
+
+9. Additional conditions for AI Training Use
+
+"AI Training Use" means reproducing, extracting, collecting, transforming or
+otherwise using Covered Material or its protected expression as training data,
+training targets, examples or feedback to develop or improve a machine-learning
+model. It includes pretraining, fine-tuning, continued training, reinforcement
+learning, distillation, and synthetic-data generation for those purposes,
+including through intermediate datasets, translations, paraphrases or other
+transformations that retain protected expression. Preparing or supplying such
+material for another person's AI Training Use is subject to the same conditions.
+Facts, ideas and independently created material remain outside this definition.
+
+Merely running or modifying the project's forecasting, training or optimization
+software for an otherwise permitted purpose is not AI Training Use of its source
+or documentation. Ordinary inference, retrieval and assistant-assisted development
+are not AI Training Use unless Covered Material is also used to train or improve
+a model. Other license conditions, including noncommercial use, still apply.
+
+AI Training Use is permitted only if BOTH of the following conditions hold:
+(a) Every model trained or improved with Covered Material is an Open Model.
+(b) Every company or other organization conducting, directing or commissioning
+    that use, or for whose specific benefit it is conducted, is a Qualifying
+    European Entity. Individuals acting independently for personal purposes
+    remain subject to (a); acting for an organization does not avoid (b).
+These conditions apply equally to commercial and noncommercial organizations,
+research partnerships, affiliates, contractors and intermediaries. Section 3
+continues to require a separate agreement for any commercial use.
+
+An "Open Model" is a model whose complete trained parameters (including weights,
+adapters and other learned state), architecture, inference and training source
+code, training configuration, and sufficiently detailed information about the
+training data and process to enable a skilled person to reproduce and modify
+its training are publicly available without charge. Those releases must permit
+anyone to use, study, modify and redistribute the model and released code for
+any purpose, including commercially, without individual approval or a separate
+commercial agreement. API-only access, a research-only release, or public weights
+alone do not qualify. The required releases must occur no later than the first
+use of the resulting model beyond training, validation and evaluation necessary
+to prepare that release, and remain available for as long as the model is used
+or distributed. A plan to release later does not authorize closed deployment.
+
+"European Territory" means the European Economic Area (the European Union,
+Norway, Iceland and Liechtenstein), the United Kingdom, and Switzerland.
+
+A "Qualifying European Entity" is an entity incorporated or legally established
+in the European Territory whose actual headquarters, central administration and
+principal place of management are located there. Every ultimate controlling
+entity must meet the same requirements, and every natural person exercising
+ultimate control must be habitually resident in the European Territory. Where
+there is no controlling owner, the entity's actual governing body and management
+must exercise ultimate decision-making authority from the European Territory.
+
+"Control" means the direct or indirect ability, individually or jointly, to
+direct management or material policies, through ownership, voting rights, board
+appointment rights, contractual arrangements, decisive veto rights, trusts,
+nominees or otherwise. It includes effective control without majority ownership
+and is assessed through every intermediate entity. A passive minority investment
+alone does not establish control. European incorporation, a registered office,
+tax residence, local computing infrastructure or an intermediate European holding
+company does not alone establish qualification.
+
+AI Training Use by, on behalf of, at the direction of, or for the specific benefit
+of a non-qualifying organization is prohibited, including through a European
+subsidiary, affiliate, contractor, research institution, proxy or arrangement
+intended to circumvent these conditions. Qualification must be maintained during
+AI Training Use; outsourcing or transferring that use does not remove the gates.
+Distributors must preserve these terms with Covered Material supplied for AI
+Training Use and may not grant permission to bypass them.
+
+To the extent applicable law permits reservation, the Licensor expressly reserves
+text-and-data-mining rights for AI Training Use outside these conditions,
+including under Article 4(3) of Directive (EU) 2019/790. This reservation does
+not restrict mandatory statutory exceptions or claim control of third-party
+rights. Section 9 does not alter LICENSE-WEIGHTS, prior grants applicable to
+previously received versions, or an expressly differing written agreement.
